@@ -2881,8 +2881,8 @@ class ParticleEffect {
 
             renderer.domElement.addEventListener('mousemove', e => {
                 if (isDragging) {
-                    cameraAngle -= (e.clientX - prevX) * 0.005;
-                    cameraHeight += (e.clientY - prevY) * 0.5;
+                    cameraAngle += (e.clientX - prevX) * 0.005;
+                    cameraHeight -= (e.clientY - prevY) * 0.5;
                     cameraHeight = Math.max(-80, Math.min(100, cameraHeight));
                     prevX = e.clientX;
                     prevY = e.clientY;
@@ -4402,8 +4402,9 @@ class ParticleEffect {
                     energy: organism.energy,
                     health: organism.health,
                     neuralNetwork: organism.brain ? {
-                        weightsIH: organism.brain.weightsIH,
-                        weightsHO: organism.brain.weightsHO
+                        weights: organism.brain.weights,
+                        complexity: organism.type === 'humanoid' ? 2 : 1,
+                        weightCount: organism.brain.weights.length
                     } : null
                 };
 
@@ -4585,15 +4586,23 @@ class ParticleEffect {
                 document.getElementById('metric-dead').textContent = organisms.length - living;
                 document.getElementById('metric-avg-gen').textContent = avgGen.toFixed(1);
                 document.getElementById('metric-grid-cells').textContent = spatialGrid.gridSize * spatialGrid.gridSize;
-            }
 
-            // Add keyboard shortcut hints to help panel
-            const originalHelpContent = document.getElementById('help-panel').querySelector('.shortcut-list').innerHTML;
-            document.getElementById('help-panel').querySelector('.shortcut-list').innerHTML = originalHelpContent + `
-                <div><span>F3</span><span>Developer Console</span></div>
-                <div><span>Ctrl+Shift+B</span><span>Run Benchmark</span></div>
-                <div><span>Konami Code</span><span>Matrix Mode 🎮</span></div>
-            `;
+                // Neural network display (if organism selected)
+                const neuralWeights = document.getElementById('neural-weights');
+                if (selected && selected.brain && !selected.dead) {
+                    const weights = selected.brain.weights;
+                    neuralWeights.innerHTML = `
+                        <strong style="color: var(--text-bright);">Organism #${selected.id} (${selected.type})</strong><br>
+                        <span style="color: var(--text-dim);">Generation: ${selected.generation} | Weights: ${weights.length}</span><br><br>
+                        <strong style="color: var(--accent-blue);">Neural Network Weights:</strong><br>
+                        <code style="color: var(--text-bright); display: block; max-height: 200px; overflow-y: auto; background: rgba(0,0,0,0.3); padding: 8px; border-radius: 4px; margin-top: 4px;">
+                            ${weights.map((w, i) => `w[${i}]: ${w.toFixed(4)}`).join('<br>')}
+                        </code>
+                    `;
+                } else {
+                    neuralWeights.innerHTML = '<span style="color: var(--text-dim);">Select a living organism to view its neural network</span>';
+                }
+            }
 
             // Show welcome screen on first load
             showWelcomeScreen();
