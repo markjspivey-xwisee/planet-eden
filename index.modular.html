@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="Planet Eden - God Mode AI Life Simulation with Neural Networks">
+    <title>🌍 Planet Eden - God Mode Life Simulation</title>
+
+    <!-- External libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+
+    <!-- Modular CSS -->
+    <link rel="stylesheet" href="css/style.css">
+
+    <style>
+        /* Critical inline styles for initial load */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            background: #000;
+            color: #fff;
+        }
+
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        #ui-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        #ui-overlay > * {
+            pointer-events: auto;
+        }
+
+        #loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 10000;
+            font-size: 24px;
+            color: #00d4ff;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, rgba(0, 40, 80, 0.95), rgba(0, 20, 50, 0.95));
+            color: white;
+            padding: 15px 25px;
+            border-radius: 8px;
+            border: 2px solid #00d4ff;
+            font-size: 14px;
+            font-weight: 500;
+            z-index: 10000;
+            box-shadow: 0 4px 20px rgba(0, 200, 255, 0.3);
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+        }
+
+        .panel {
+            position: fixed;
+            background: rgba(0, 20, 40, 0.92);
+            border: 2px solid #00d4ff;
+            border-radius: 12px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 200, 255, 0.2);
+        }
+
+        #stats-panel {
+            top: 20px;
+            right: 20px;
+            min-width: 250px;
+        }
+
+        #selected-panel {
+            bottom: 20px;
+            right: 20px;
+            min-width: 250px;
+            display: none;
+        }
+
+        #fps-counter {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            color: #0f0;
+        }
+
+        h3 {
+            margin-bottom: 10px;
+            color: #00d4ff;
+            border-bottom: 1px solid #00d4ff;
+            padding-bottom: 5px;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+            font-size: 14px;
+        }
+
+        .stat-label {
+            color: #aaa;
+        }
+
+        .stat-value {
+            color: #fff;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">
+        🌍 Loading Planet Eden...
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <div id="ui-overlay">
+        <!-- Stats Panel -->
+        <div id="stats-panel" class="panel">
+            <h3>🌍 Planet Stats</h3>
+            <div class="stat-row">
+                <span class="stat-label">Time:</span>
+                <span class="stat-value" id="stat-time">0</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">🌳 Plants:</span>
+                <span class="stat-value" id="stat-plants">0</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">🦌 Herbivores:</span>
+                <span class="stat-value" id="stat-herbivores">0</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">🦁 Carnivores:</span>
+                <span class="stat-value" id="stat-carnivores">0</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">👤 Humanoids:</span>
+                <span class="stat-value" id="stat-humanoids">0</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Total:</span>
+                <span class="stat-value" id="stat-total">0</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Avg Gen:</span>
+                <span class="stat-value" id="stat-avg-gen">0</span>
+            </div>
+        </div>
+
+        <!-- Selected Organism Panel -->
+        <div id="selected-panel" class="panel">
+            <h3>🔍 Selected Organism</h3>
+            <div class="stat-row">
+                <span class="stat-label">ID:</span>
+                <span class="stat-value" id="selected-id">-</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Type:</span>
+                <span class="stat-value" id="selected-type">-</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Energy:</span>
+                <span class="stat-value" id="selected-energy">-</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Health:</span>
+                <span class="stat-value" id="selected-health">-</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Age:</span>
+                <span class="stat-value" id="selected-age">-</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Generation:</span>
+                <span class="stat-value" id="selected-gen">-</span>
+            </div>
+        </div>
+
+        <!-- FPS Counter -->
+        <div id="fps-counter">60 FPS</div>
+
+        <!-- Population Chart -->
+        <div id="chart-container" class="panel" style="bottom: 20px; left: 20px; width: 400px; height: 250px; display: none;">
+            <h3>📊 Population</h3>
+            <canvas id="population-chart"></canvas>
+        </div>
+    </div>
+
+    <!-- Main application entry point -->
+    <script type="module" src="js/main.js"></script>
+
+    <script>
+        // Hide loading screen after everything loads
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                const loading = document.getElementById('loading');
+                if (loading) loading.style.display = 'none';
+            }, 1000);
+        });
+
+        // Pause/resume with spacebar
+        document.addEventListener('keydown', e => {
+            if (e.code === 'Space' && window.PlanetEden) {
+                window.PlanetEden.state.paused = !window.PlanetEden.state.paused;
+                const msg = window.PlanetEden.state.paused ? '⏸️ Paused' : '▶️ Resumed';
+                const notification = document.createElement('div');
+                notification.className = 'notification';
+                notification.textContent = msg;
+                document.body.appendChild(notification);
+                setTimeout(() => notification.remove(), 2000);
+            }
+        });
+
+        // Debug console helpers
+        console.log('%c🌍 Planet Eden - Modular Version', 'color: #00d4ff; font-size: 20px; font-weight: bold');
+        console.log('%cAccess simulation via: window.PlanetEden', 'color: #0f0; font-size: 14px');
+        console.log('%cExport data: PlanetEden.exportPopulationCSV()', 'color: #ff0; font-size: 12px');
+        console.log('%cExport world: PlanetEden.exportWorldJSON()', 'color: #ff0; font-size: 12px');
+        console.log('%cExport selected: PlanetEden.exportOrganism()', 'color: #ff0; font-size: 12px');
+    </script>
+</body>
+</html>
