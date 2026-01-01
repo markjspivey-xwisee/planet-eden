@@ -10,6 +10,28 @@ Control life, terraform landscapes, and watch AI organisms evolve in real-time w
 
 ---
 
+## 🏗️ **NEW: Modular Architecture**
+
+Planet Eden has been refactored into a **clean, modular codebase** with true neural network AI!
+
+**What's New:**
+
+- 🧠 **True Neural Networks** - 3 outputs for full 3D movement control (not just speed)
+- 📦 **ES6 Modules** - Clean separation: `organism.js`, `neural-network.js`, `powers.js`, `ui.js`, `main.js`
+- 🎨 **Separated CSS** - All styling in `css/style.css`
+- 📚 **Better Docs** - See [MODULAR-STRUCTURE.md](MODULAR-STRUCTURE.md) for architecture details
+- 🔧 **Dev Server** - Run `node server.js` for local development
+- 💾 **Legacy Preserved** - Original version saved as `planet-eden-complete.html`
+
+**Benefits:**
+
+- ✅ Easier to maintain and extend
+- ✅ Better performance (parallel module loading)
+- ✅ Modular testing
+- ✅ Smarter AI with multi-output neural networks
+
+---
+
 ## ✨ Features
 
 ### 🎮 God Powers (22 Total)
