@@ -123,17 +123,27 @@ Shape the world with your divine abilities across 4 categories:
 No installation required - runs directly in your browser!
 
 ### Run Locally
+
 ```bash
-# Download the file
+# Download the repository
 git clone https://github.com/markjspivey-xwisee/planet-eden.git
 cd planet-eden
 
-# Open in browser
-# Just double-click index.html or:
+# Option 1: Open full-featured version directly
 start index.html  # Windows
 open index.html   # Mac
 xdg-open index.html  # Linux
+
+# Option 2: Run with development server (recommended for modular development)
+node server.js
+# Then visit http://localhost:8000/
 ```
+
+**File Structure:**
+
+- `index.html` - **Full-featured version** (4,800+ lines, all UI, served on GitHub Pages)
+- `index.modular.html` - **Minimal modular version** (clean entry point for development)
+- `js/`, `css/` - **Modular codebase** (for development and extension)
 
 **Requirements:** Any modern browser (Chrome, Firefox, Edge, Safari)
 
