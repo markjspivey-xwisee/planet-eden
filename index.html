@@ -2517,7 +2517,9 @@ class ParticleEffect {
                 think(spatialGrid) {
                     if (this.type === 'plant' || !this.brain) return;
 
-                    let nearestFood = Infinity, nearestPredator = Infinity, nearestPrey = Infinity;
+                    let nearestFood = null, nearestFoodDist = Infinity;
+                    let nearestPredator = null, nearestPredatorDist = Infinity;
+                    let nearestPrey = null, nearestPreyDist = Infinity;
 
                     // Use spatial grid instead of checking all organisms - HUGE performance boost
                     const nearby = spatialGrid.getNearby(this.position);
@@ -2527,35 +2529,68 @@ class ParticleEffect {
                         const dist = this.position.distanceTo(o.position);
 
                         if (this.type === 'herbivore' || this.type === 'humanoid') {
-                            if (o.type === 'plant' && dist < nearestFood) nearestFood = dist;
-                            if (o.type === 'carnivore' && dist < nearestPredator) nearestPredator = dist;
+                            if (o.type === 'plant' && dist < nearestFoodDist) {
+                                nearestFood = o;
+                                nearestFoodDist = dist;
+                            }
+                            if (o.type === 'carnivore' && dist < nearestPredatorDist) {
+                                nearestPredator = o;
+                                nearestPredatorDist = dist;
+                            }
                         }
 
                         if (this.type === 'carnivore') {
-                            if ((o.type === 'herbivore' || o.type === 'humanoid') && dist < nearestPrey) nearestPrey = dist;
+                            if ((o.type === 'herbivore' || o.type === 'humanoid') && dist < nearestPreyDist) {
+                                nearestPrey = o;
+                                nearestPreyDist = dist;
+                            }
                         }
                     }
 
                     const inputs = [
                         this.energy / 100,
                         this.health / 100,
-                        1 - Math.min(nearestFood / 40, 1),
-                        1 - Math.min(nearestPredator / 40, 1),
-                        1 - Math.min(nearestPrey / 40, 1)
+                        1 - Math.min(nearestFoodDist / 40, 1),
+                        1 - Math.min(nearestPredatorDist / 40, 1),
+                        1 - Math.min(nearestPreyDist / 40, 1)
                     ];
 
                     const output = this.brain.think(inputs);
 
+                    // FIXED: Actually seek food/prey and flee predators!
                     const normal = this.position.clone().normalize();
-                    const tangent = new THREE.Vector3(
-                        Math.random() - 0.5,
-                        Math.random() - 0.5,
-                        Math.random() - 0.5
-                    );
-                    tangent.sub(normal.clone().multiplyScalar(tangent.dot(normal)));
-                    tangent.normalize();
+                    let targetDirection = new THREE.Vector3();
 
-                    this.velocity.copy(tangent.multiplyScalar(output * this.speed));
+                    // Decide what to do based on situation
+                    const isHungry = this.energy < 50;
+                    const inDanger = nearestPredatorDist < 15;
+
+                    if (this.type === 'herbivore' || this.type === 'humanoid') {
+                        if (inDanger && nearestPredator) {
+                            // FLEE from predator
+                            targetDirection.subVectors(this.position, nearestPredator.position);
+                        } else if (isHungry && nearestFood) {
+                            // SEEK food
+                            targetDirection.subVectors(nearestFood.position, this.position);
+                        } else {
+                            // Wander randomly
+                            targetDirection.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5);
+                        }
+                    } else if (this.type === 'carnivore') {
+                        if (isHungry && nearestPrey) {
+                            // HUNT prey
+                            targetDirection.subVectors(nearestPrey.position, this.position);
+                        } else {
+                            // Wander randomly
+                            targetDirection.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5);
+                        }
+                    }
+
+                    // Project onto tangent plane and move
+                    targetDirection.sub(normal.clone().multiplyScalar(targetDirection.dot(normal)));
+                    targetDirection.normalize();
+
+                    this.velocity.copy(targetDirection.multiplyScalar(Math.abs(output) * this.speed));
                 }
 
                 update(delta, spatialGrid) {
