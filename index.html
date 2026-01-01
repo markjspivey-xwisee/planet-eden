@@ -749,6 +749,398 @@
         #fps-counter.show {
             display: block;
         }
+
+        /* Developer Console */
+        #dev-console {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 50vh;
+            background: rgba(5, 5, 16, 0.98);
+            border-top: 2px solid var(--border-bright);
+            z-index: 1000;
+            display: none;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+        }
+
+        #dev-console.show {
+            display: block;
+            animation: slideUp 0.3s ease-out;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+
+        .dev-console-header {
+            background: linear-gradient(135deg, rgba(0, 40, 80, 0.8), rgba(20, 10, 40, 0.8));
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .dev-console-tabs {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .dev-tab {
+            padding: 0.5rem 1rem;
+            background: rgba(0, 212, 255, 0.1);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-normal);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .dev-tab.active {
+            background: rgba(0, 212, 255, 0.3);
+            border-color: var(--border-bright);
+            color: var(--text-bright);
+        }
+
+        .dev-tab:hover {
+            background: rgba(0, 212, 255, 0.2);
+        }
+
+        .dev-console-content {
+            padding: 1rem;
+        }
+
+        .dev-section {
+            display: none;
+        }
+
+        .dev-section.active {
+            display: block;
+        }
+
+        .dev-metric {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem;
+            margin: 0.25rem 0;
+            background: rgba(0, 20, 40, 0.5);
+            border-radius: 4px;
+            border-left: 3px solid var(--border-bright);
+        }
+
+        .dev-metric-label {
+            color: var(--text-dim);
+        }
+
+        .dev-metric-value {
+            color: var(--text-bright);
+            font-weight: bold;
+        }
+
+        #neural-network-viz {
+            width: 100%;
+            height: 300px;
+            background: rgba(0, 20, 40, 0.3);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            position: relative;
+        }
+
+        #performance-graph {
+            width: 100%;
+            height: 200px;
+            background: rgba(0, 20, 40, 0.3);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+
+        /* Developer Settings Panel */
+        #dev-settings-panel {
+            position: fixed;
+            right: 20px;
+            top: 80px;
+            width: 300px;
+            background: var(--bg-panel);
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            padding: 1rem;
+            z-index: 200;
+            display: none;
+            max-height: calc(100vh - 100px);
+            overflow-y: auto;
+        }
+
+        #dev-settings-panel.show {
+            display: block;
+            animation: panelSlideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .dev-slider-group {
+            margin: 1rem 0;
+        }
+
+        .dev-slider-group label {
+            display: block;
+            color: var(--text-normal);
+            margin-bottom: 0.5rem;
+            font-size: 0.85rem;
+        }
+
+        .dev-slider-group input[type="range"] {
+            width: 100%;
+            height: 6px;
+            background: rgba(0, 212, 255, 0.2);
+            border-radius: 3px;
+            outline: none;
+        }
+
+        .dev-slider-group input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: var(--border-bright);
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .dev-slider-value {
+            color: var(--text-bright);
+            font-weight: bold;
+            float: right;
+        }
+
+        /* Code Viewer Modal */
+        #code-viewer-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(5, 5, 16, 0.98);
+            z-index: 1500;
+            display: none;
+            overflow-y: auto;
+        }
+
+        #code-viewer-modal.show {
+            display: flex;
+            flex-direction: column;
+            animation: fadeIn 0.3s;
+        }
+
+        .code-viewer-header {
+            padding: 1.5rem;
+            background: linear-gradient(135deg, rgba(0, 40, 80, 0.8), rgba(20, 10, 40, 0.8));
+            border-bottom: 2px solid var(--border-bright);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .code-viewer-content {
+            flex: 1;
+            padding: 2rem;
+            overflow-y: auto;
+        }
+
+        .code-block {
+            background: rgba(0, 20, 40, 0.8);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.6;
+            overflow-x: auto;
+            white-space: pre;
+        }
+
+        .code-section-title {
+            color: var(--text-bright);
+            margin: 2rem 0 1rem 0;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        /* Evolution Timeline */
+        #evolution-timeline {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            max-width: 1000px;
+            height: 200px;
+            background: var(--bg-panel);
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            padding: 1rem;
+            z-index: 250;
+            display: none;
+        }
+
+        #evolution-timeline.show {
+            display: block;
+            animation: panelSlideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .timeline-canvas {
+            width: 100%;
+            height: 150px;
+            background: rgba(0, 20, 40, 0.5);
+            border-radius: 8px;
+        }
+
+        /* Export Buttons */
+        .export-buttons {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin: 1rem 0;
+        }
+
+        .export-btn {
+            padding: 0.5rem 1rem;
+            background: rgba(0, 212, 255, 0.1);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-bright);
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.85rem;
+        }
+
+        .export-btn:hover {
+            background: rgba(0, 212, 255, 0.3);
+            border-color: var(--border-bright);
+            transform: translateY(-2px);
+        }
+
+        /* Spatial Grid Overlay */
+        .spatial-grid-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+        }
+
+        /* Matrix Mode Easter Egg */
+        .matrix-rain {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 9999;
+            display: none;
+        }
+
+        .matrix-rain.active {
+            display: block;
+        }
+
+        /* Benchmark Results */
+        #benchmark-results {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--bg-panel);
+            border: 2px solid var(--border-bright);
+            border-radius: 12px;
+            padding: 2rem;
+            z-index: 1500;
+            display: none;
+            max-width: 600px;
+            box-shadow: 0 20px 60px rgba(0, 212, 255, 0.3);
+        }
+
+        #benchmark-results.show {
+            display: block;
+            animation: notificationBounce 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        .benchmark-score {
+            font-size: 3rem;
+            color: var(--border-bright);
+            text-align: center;
+            margin: 1rem 0;
+            text-shadow: 0 0 20px rgba(0, 212, 255, 0.8);
+        }
+
+        .benchmark-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+
+        /* Family Tree Visualization */
+        #family-tree-viz {
+            width: 100%;
+            height: 250px;
+            background: rgba(0, 20, 40, 0.3);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin: 1rem 0;
+            position: relative;
+            overflow: auto;
+        }
+
+        .tree-node {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 2px solid var(--border-bright);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .tree-node:hover {
+            transform: scale(1.2);
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.8);
+        }
+
+        .tree-line {
+            position: absolute;
+            background: var(--border);
+            height: 2px;
+        }
+
+        /* Toggle Button for Dev Features */
+        .dev-toggle-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 212, 255, 0.2);
+            border: 1px solid var(--border-bright);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 300;
+            transition: all 0.3s;
+        }
+
+        .dev-toggle-btn:hover {
+            background: rgba(0, 212, 255, 0.4);
+            box-shadow: 0 0 30px rgba(0, 212, 255, 0.8);
+            transform: scale(1.1);
+        }
     </style>
 </head>
 <body>
@@ -1010,6 +1402,346 @@
         <button id="btn-spawn-carnivores" title="Add 3 carnivores">🦁 +Carnivores</button>
         <button id="btn-spawn-humanoids" title="Add 2 humanoids">👤 +Humanoids</button>
     </div>
+
+    <!-- Developer Console -->
+    <div id="dev-console">
+        <div class="dev-console-header">
+            <div class="dev-console-tabs">
+                <button class="dev-tab active" data-tab="performance">⚡ Performance</button>
+                <button class="dev-tab" data-tab="neural">🧠 Neural Network</button>
+                <button class="dev-tab" data-tab="entity">📊 Entities</button>
+                <button class="dev-tab" data-tab="export">💾 Export</button>
+            </div>
+            <button id="close-dev-console" style="padding: 0.5rem 1rem; border-radius: 4px;">✕ Close</button>
+        </div>
+        <div class="dev-console-content">
+            <div id="performance-section" class="dev-section active">
+                <h3 style="color: var(--text-bright); margin-bottom: 1rem;">Performance Metrics</h3>
+                <div class="dev-metric">
+                    <span class="dev-metric-label">Frame Time:</span>
+                    <span class="dev-metric-value" id="metric-frame-time">0ms</span>
+                </div>
+                <div class="dev-metric">
+                    <span class="dev-metric-label">Draw Calls:</span>
+                    <span class="dev-metric-value" id="metric-draw-calls">0</span>
+                </div>
+                <div class="dev-metric">
+                    <span class="dev-metric-label">Triangles:</span>
+                    <span class="dev-metric-value" id="metric-triangles">0</span>
+                </div>
+                <div class="dev-metric">
+                    <span class="dev-metric-label">Active Particles:</span>
+                    <span class="dev-metric-value" id="metric-particles">0</span>
+                </div>
+                <div class="dev-metric">
+                    <span class="dev-metric-label">Memory (MB):</span>
+                    <span class="dev-metric-value" id="metric-memory">0</span>
+                </div>
+                <canvas id="performance-graph"></canvas>
+            </div>
+            <div id="neural-section" class="dev-section">
+                <h3 style="color: var(--text-bright); margin-bottom: 1rem;">Neural Network Visualization</h3>
+                <p style="color: var(--text-dim); margin-bottom: 1rem;">Select an organism to view its brain</p>
+                <canvas id="neural-network-viz"></canvas>
+                <div id="neural-weights" style="margin-top: 1rem; font-size: 10px; color: var(--text-dim);"></div>
+            </div>
+            <div id="entity-section" class="dev-section">
+                <h3 style="color: var(--text-bright); margin-bottom: 1rem;">Entity Statistics</h3>
+                <div class="dev-metric">
+                    <span class="dev-metric-label">Total Organisms:</span>
+                    <span class="dev-metric-value" id="metric-total-organisms">0</span>
+                </div>
+                <div class="dev-metric">
+                    <span class="dev-metric-label">Living:</span>
+                    <span class="dev-metric-value" id="metric-living">0</span>
+                </div>
+                <div class="dev-metric">
+                    <span class="dev-metric-label">Dead:</span>
+                    <span class="dev-metric-value" id="metric-dead">0</span>
+                </div>
+                <div class="dev-metric">
+                    <span class="dev-metric-label">Avg Generation:</span>
+                    <span class="dev-metric-value" id="metric-avg-gen">0</span>
+                </div>
+                <div class="dev-metric">
+                    <span class="dev-metric-label">Spatial Grid Cells:</span>
+                    <span class="dev-metric-value" id="metric-grid-cells">0</span>
+                </div>
+                <div style="margin-top: 1rem;">
+                    <label style="color: var(--text-normal);">
+                        <input type="checkbox" id="toggle-spatial-grid"> Show Spatial Grid Overlay
+                    </label>
+                </div>
+            </div>
+            <div id="export-section" class="dev-section">
+                <h3 style="color: var(--text-bright); margin-bottom: 1rem;">Data Export & Analysis</h3>
+                <div class="export-buttons">
+                    <button class="export-btn" id="export-csv">📊 Export Population CSV</button>
+                    <button class="export-btn" id="export-json">📦 Export World JSON</button>
+                    <button class="export-btn" id="export-benchmark">⚡ Export Benchmark</button>
+                    <button class="export-btn" id="export-organism">🧬 Export Selected Organism</button>
+                </div>
+                <div id="export-status" style="margin-top: 1rem; color: var(--text-dim); font-size: 12px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Developer Settings Panel -->
+    <div id="dev-settings-panel">
+        <h3 style="color: var(--text-bright); margin-bottom: 1rem;">🔧 Developer Settings</h3>
+        <p style="color: var(--text-dim); font-size: 0.85rem; margin-bottom: 1rem;">Live parameter tweaking</p>
+
+        <div class="dev-slider-group">
+            <label>
+                Mutation Rate: <span class="dev-slider-value" id="val-mutation">10%</span>
+            </label>
+            <input type="range" id="slider-mutation" min="0" max="100" value="10">
+        </div>
+
+        <div class="dev-slider-group">
+            <label>
+                Reproduction Threshold: <span class="dev-slider-value" id="val-reproduction">60</span>
+            </label>
+            <input type="range" id="slider-reproduction" min="30" max="90" value="60">
+        </div>
+
+        <div class="dev-slider-group">
+            <label>
+                Energy Cost Multiplier: <span class="dev-slider-value" id="val-energy">1.0x</span>
+            </label>
+            <input type="range" id="slider-energy" min="0.1" max="3" step="0.1" value="1">
+        </div>
+
+        <div class="dev-slider-group">
+            <label>
+                AI Perception Range: <span class="dev-slider-value" id="val-perception">20</span>
+            </label>
+            <input type="range" id="slider-perception" min="5" max="50" value="20">
+        </div>
+
+        <div class="dev-slider-group">
+            <label>
+                Evolution Speed: <span class="dev-slider-value" id="val-evo-speed">1.0x</span>
+            </label>
+            <input type="range" id="slider-evo-speed" min="0.1" max="5" step="0.1" value="1">
+        </div>
+
+        <div class="dev-slider-group">
+            <label>
+                Planet Gravity: <span class="dev-slider-value" id="val-gravity">1.0x</span>
+            </label>
+            <input type="range" id="slider-gravity" min="0.1" max="3" step="0.1" value="1">
+        </div>
+
+        <button id="reset-dev-settings" style="width: 100%; margin-top: 1rem; padding: 0.75rem;">
+            ↻ Reset to Defaults
+        </button>
+    </div>
+
+    <!-- Code Viewer Modal -->
+    <div id="code-viewer-modal">
+        <div class="code-viewer-header">
+            <h2 style="color: var(--text-bright); margin: 0;">📜 Source Code</h2>
+            <button id="close-code-viewer" style="padding: 0.5rem 1rem; border-radius: 4px;">✕ Close</button>
+        </div>
+        <div class="code-viewer-content">
+            <p style="color: var(--text-normal); margin-bottom: 2rem;">
+                Single-file architecture: 3,290+ lines of vanilla JavaScript, Three.js, and Chart.js
+            </p>
+            <div id="code-content">
+                <div class="code-section-title" id="code-ai">🧠 AI & Neural Networks</div>
+                <div class="code-block">// NeuralNetwork class with feedforward architecture
+//Simple 3-layer network: Input → Hidden → Output
+// Organisms use this for decision-making
+
+class NeuralNetwork {
+    constructor(inputSize, hiddenSize, outputSize) {
+        // Initialize weights with random values
+        this.weightsIH = Array(inputSize).fill().map(() =>
+            Array(hiddenSize).fill().map(() => Math.random() * 2 - 1)
+        );
+        this.weightsHO = Array(hiddenSize).fill().map(() =>
+            Array(outputSize).fill().map(() => Math.random() * 2 - 1)
+        );
+    }
+
+    // Feedforward propagation
+    predict(inputs) {
+        const hidden = this.weightsIH[0].map((_, h) =>
+            inputs.reduce((sum, input, i) =>
+                sum + input * this.weightsIH[i][h], 0
+            )
+        ).map(x => Math.tanh(x)); // Activation function
+
+        const outputs = this.weightsHO[0].map((_, o) =>
+            hidden.reduce((sum, h, i) =>
+                sum + h * this.weightsHO[i][o], 0
+            )
+        ).map(x => Math.tanh(x));
+
+        return outputs;
+    }
+
+    // Mutation for evolution
+    mutate() {
+        const mutateMatrix = (matrix) => {
+            for (let i = 0; i < matrix.length; i++) {
+                for (let j = 0; j < matrix[i].length; j++) {
+                    if (Math.random() < 0.1) { // 10% mutation rate
+                        matrix[i][j] += (Math.random() - 0.5) * 0.5;
+                    }
+                }
+            }
+        };
+        mutateMatrix(this.weightsIH);
+        mutateMatrix(this.weightsHO);
+    }
+}</div>
+
+                <div class="code-section-title" id="code-physics">⚙️ Physics & Movement</div>
+                <div class="code-block">// Organisms stick to spherical planet surface using normal vectors
+// Velocity is projected onto tangent plane for smooth movement
+
+function moveOnSphere(organism, direction, speed) {
+    const normal = organism.position.clone().normalize();
+
+    // Project direction onto tangent plane
+    const tangentDirection = direction.clone()
+        .sub(normal.clone().multiplyScalar(direction.dot(normal)))
+        .normalize();
+
+    // Apply movement
+    organism.position.add(tangentDirection.multiplyScalar(speed));
+
+    // Snap back to sphere surface
+    organism.position.normalize().multiplyScalar(PLANET_RADIUS);
+
+    // Update rotation to face surface normal
+    organism.mesh.up.copy(normal);
+    organism.mesh.lookAt(
+        organism.position.clone().add(tangentDirection)
+    );
+}</div>
+
+                <div class="code-section-title" id="code-powers">⚡ God Powers System</div>
+                <div class="code-block">// Declarative power system - each power has target type and execute function
+// Supports 4 target types: creature, location, terraform, global
+
+const POWERS = {
+    'smite': {
+        name: 'Smite',
+        targetType: 'creature',
+        execute: (organism) => {
+            const skyPos = organism.position.clone()
+                .normalize().multiplyScalar(PLANET_RADIUS + 30);
+            createLightningEffect(skyPos, organism.position);
+            organism.die();
+            playSound(200, 300);
+        }
+    },
+    'terraform': {
+        name: 'Raise Terrain',
+        targetType: 'terraform',
+        execute: (clickPoint) => {
+            // Direct vertex manipulation with falloff
+            const positions = planetGeometry.attributes.position;
+            for (let i = 0; i < positions.count; i++) {
+                const vertex = new THREE.Vector3(
+                    positions.getX(i),
+                    positions.getY(i),
+                    positions.getZ(i)
+                );
+                const dist = vertex.distanceTo(clickPoint);
+                if (dist < brushSize) {
+                    const falloff = 1 - (dist / brushSize);
+                    const newLen = vertex.length() + strength * falloff;
+                    vertex.normalize().multiplyScalar(newLen);
+                    positions.setXYZ(i, vertex.x, vertex.y, vertex.z);
+                }
+            }
+            planetGeometry.computeVertexNormals();
+        }
+    }
+};</div>
+
+                <div class="code-section-title" id="code-render">🎨 Rendering & Effects</div>
+                <div class="code-block">// Particle system with gravity, spiral motion, and size animation
+// Auto-disposal after lifecycle completes
+
+class ParticleEffect {
+    update(delta) {
+        const progress = this.timer / this.duration;
+
+        for (let i = 0; i < this.particleCount; i++) {
+            const particle = this.particles[i];
+
+            // Apply gravity
+            particle.velocity.y -= delta * 2;
+
+            // Add spiral effect
+            const angle = this.timer * 0.005;
+            positions[i*3] += Math.cos(angle + i) * 0.1 * delta;
+            positions[i*3+2] += Math.sin(angle + i) * 0.1 * delta;
+
+            // Animate size
+            sizes[i] = (0.2 + Math.sin(progress * Math.PI) * 0.8);
+        }
+
+        // Smooth fade out
+        this.mesh.material.opacity = 1 - Math.pow(progress, 2);
+
+        return progress >= 1; // Signal completion
+    }
+}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Evolution Timeline -->
+    <div id="evolution-timeline">
+        <h3 style="color: var(--text-bright); margin: 0 0 0.5rem 0;">🧬 Evolution Timeline</h3>
+        <canvas class="timeline-canvas" id="timeline-canvas"></canvas>
+        <div style="margin-top: 0.5rem; font-size: 0.85rem; color: var(--text-dim);">
+            <span id="timeline-info">Hover over timeline to see generation details</span>
+        </div>
+    </div>
+
+    <!-- Benchmark Results Modal -->
+    <div id="benchmark-results">
+        <h2 style="color: var(--text-bright); text-align: center;">⚡ Performance Benchmark</h2>
+        <div class="benchmark-score" id="benchmark-score">0</div>
+        <p style="text-align: center; color: var(--text-normal); margin-bottom: 1rem;" id="benchmark-rating">-</p>
+        <div class="benchmark-details">
+            <div class="dev-metric">
+                <span class="dev-metric-label">Avg FPS:</span>
+                <span class="dev-metric-value" id="bench-fps">0</span>
+            </div>
+            <div class="dev-metric">
+                <span class="dev-metric-label">Frame Time:</span>
+                <span class="dev-metric-value" id="bench-frame-time">0ms</span>
+            </div>
+            <div class="dev-metric">
+                <span class="dev-metric-label">Max Entities:</span>
+                <span class="dev-metric-value" id="bench-entities">0</span>
+            </div>
+            <div class="dev-metric">
+                <span class="dev-metric-label">GPU:</span>
+                <span class="dev-metric-value" id="bench-gpu">-</span>
+            </div>
+        </div>
+        <div class="export-buttons" style="justify-content: center; margin-top: 1.5rem;">
+            <button class="export-btn" id="share-benchmark">📢 Share Results</button>
+            <button class="export-btn" id="close-benchmark">✕ Close</button>
+        </div>
+    </div>
+
+    <!-- Matrix Rain Canvas (Easter Egg) -->
+    <canvas class="matrix-rain" id="matrix-rain"></canvas>
+
+    <!-- Developer Toggle Button -->
+    <button class="dev-toggle-btn" id="dev-toggle" title="Developer Tools (F3)">
+        🔧
+    </button>
 
     <script>
         function showNotification(msg) {
@@ -3245,6 +3977,409 @@
             document.getElementById('setting-fps').checked = gameSettings.showFPS;
             document.getElementById('fps-counter').classList.toggle('show', gameSettings.showFPS);
 
+            // ========== DEVELOPER FEATURES INITIALIZATION ==========
+
+            // Developer Console State
+            const devConsole = {
+                visible: false,
+                activeTab: 'performance',
+                performanceHistory: [],
+                spatialGridVisible: false
+            };
+
+            // Performance tracking
+            const perfMetrics = {
+                frameTime: 0,
+                drawCalls: 0,
+                triangles: 0,
+                memory: 0
+            };
+
+            // Developer Settings (live tweakable parameters)
+            const devSettings = {
+                mutationRate: 0.1,
+                reproductionThreshold: 60,
+                energyCostMultiplier: 1.0,
+                perceptionRange: 20,
+                evolutionSpeed: 1.0,
+                gravity: 1.0
+            };
+
+            // Toggle Developer Console (F3 key)
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'F3') {
+                    e.preventDefault();
+                    devConsole.visible = !devConsole.visible;
+                    document.getElementById('dev-console').classList.toggle('show', devConsole.visible);
+                    playSound(700, 100);
+                }
+
+                // Easter Egg: Type "benchmark" to run performance test
+                if (e.key === 'b' && e.ctrlKey && e.shiftKey) {
+                    runBenchmark();
+                }
+            });
+
+            // Easter Egg: Konami Code detection
+            const konamiCode = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
+            let konamiIndex = 0;
+            document.addEventListener('keydown', (e) => {
+                if (e.key === konamiCode[konamiIndex]) {
+                    konamiIndex++;
+                    if (konamiIndex === konamiCode.length) {
+                        activateMatrixMode();
+                        konamiIndex = 0;
+                    }
+                } else {
+                    konamiIndex = 0;
+                }
+            });
+
+            // Dev Console Tab Switching
+            document.querySelectorAll('.dev-tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    const tabName = tab.dataset.tab;
+                    devConsole.activeTab = tabName;
+
+                    // Update active tab styling
+                    document.querySelectorAll('.dev-tab').forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+
+                    // Show corresponding section
+                    document.querySelectorAll('.dev-section').forEach(s => s.classList.remove('active'));
+                    document.getElementById(tabName + '-section').classList.add('active');
+
+                    playSound(600, 50);
+                });
+            });
+
+            // Close dev console button
+            document.getElementById('close-dev-console').addEventListener('click', () => {
+                devConsole.visible = false;
+                document.getElementById('dev-console').classList.remove('show');
+                playSound(500, 80);
+            });
+
+            // Dev toggle button
+            document.getElementById('dev-toggle').addEventListener('click', () => {
+                devConsole.visible = !devConsole.visible;
+                document.getElementById('dev-console').classList.toggle('show', devConsole.visible);
+                playSound(700, 100);
+            });
+
+            // Developer Settings Sliders
+            const sliders = [
+                { id: 'mutation', key: 'mutationRate', format: (v) => v + '%' },
+                { id: 'reproduction', key: 'reproductionThreshold', format: (v) => v },
+                { id: 'energy', key: 'energyCostMultiplier', format: (v) => v.toFixed(1) + 'x' },
+                { id: 'perception', key: 'perceptionRange', format: (v) => v },
+                { id: 'evo-speed', key: 'evolutionSpeed', format: (v) => v.toFixed(1) + 'x' },
+                { id: 'gravity', key: 'gravity', format: (v) => v.toFixed(1) + 'x' }
+            ];
+
+            sliders.forEach(({ id, key, format }) => {
+                const slider = document.getElementById(`slider-${id}`);
+                const valueDisplay = document.getElementById(`val-${id}`);
+
+                slider.addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    devSettings[key] = id === 'mutation' ? value / 100 : value;
+                    valueDisplay.textContent = format(value);
+                });
+            });
+
+            document.getElementById('reset-dev-settings').addEventListener('click', () => {
+                devSettings.mutationRate = 0.1;
+                devSettings.reproductionThreshold = 60;
+                devSettings.energyCostMultiplier = 1.0;
+                devSettings.perceptionRange = 20;
+                devSettings.evolutionSpeed = 1.0;
+                devSettings.gravity = 1.0;
+
+                document.getElementById('slider-mutation').value = 10;
+                document.getElementById('slider-reproduction').value = 60;
+                document.getElementById('slider-energy').value = 1;
+                document.getElementById('slider-perception').value = 20;
+                document.getElementById('slider-evo-speed').value = 1;
+                document.getElementById('slider-gravity').value = 1;
+
+                sliders.forEach(({ id, format }) => {
+                    const slider = document.getElementById(`slider-${id}`);
+                    document.getElementById(`val-${id}`).textContent = format(parseFloat(slider.value));
+                });
+
+                showNotification('🔧 Settings reset to defaults');
+                playSound(800, 150);
+            });
+
+            // Export Functions
+            document.getElementById('export-csv').addEventListener('click', () => {
+                exportPopulationCSV();
+            });
+
+            document.getElementById('export-json').addEventListener('click', () => {
+                exportWorldJSON();
+            });
+
+            document.getElementById('export-benchmark').addEventListener('click', () => {
+                exportBenchmark();
+            });
+
+            document.getElementById('export-organism').addEventListener('click', () => {
+                if (selected) {
+                    exportOrganism(selected);
+                } else {
+                    showNotification('⚠️ No organism selected');
+                }
+            });
+
+            function exportPopulationCSV() {
+                const csv = ['Time,Plants,Herbivores,Carnivores,Humanoids,Total,AvgGeneration'];
+                const data = `${state.time.toFixed(0)},${populationCounts.plant},${populationCounts.herbivore},${populationCounts.carnivore},${populationCounts.humanoid},${organisms.length},${(organisms.reduce((sum, o) => sum + o.generation, 0) / organisms.length).toFixed(1)}`;
+                csv.push(data);
+
+                const blob = new Blob([csv.join('\\n')], { type: 'text/csv' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `planet-eden-population-${Date.now()}.csv`;
+                a.click();
+
+                showNotification('📊 Population data exported');
+                playSound(1000, 150);
+            }
+
+            function exportWorldJSON() {
+                const worldData = {
+                    timestamp: Date.now(),
+                    time: state.time,
+                    organisms: organisms.map(o => ({
+                        id: o.id,
+                        type: o.type,
+                        position: { x: o.position.x, y: o.position.y, z: o.position.z },
+                        energy: o.energy,
+                        health: o.health,
+                        age: o.age,
+                        generation: o.generation,
+                        dead: o.dead
+                    })),
+                    settings: devSettings,
+                    populationCounts
+                };
+
+                const blob = new Blob([JSON.stringify(worldData, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `planet-eden-world-${Date.now()}.json`;
+                a.click();
+
+                showNotification('📦 World state exported');
+                playSound(1000, 150);
+            }
+
+            function exportOrganism(organism) {
+                const data = {
+                    id: organism.id,
+                    type: organism.type,
+                    generation: organism.generation,
+                    age: organism.age,
+                    energy: organism.energy,
+                    health: organism.health,
+                    neuralNetwork: organism.brain ? {
+                        weightsIH: organism.brain.weightsIH,
+                        weightsHO: organism.brain.weightsHO
+                    } : null
+                };
+
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `organism-${organism.type}-${organism.id}.json`;
+                a.click();
+
+                showNotification(`🧬 Organism #${organism.id} exported`);
+                playSound(900, 150);
+            }
+
+            function exportBenchmark() {
+                const benchData = {
+                    timestamp: Date.now(),
+                    avgFPS: Math.round(1000 / perfMetrics.frameTime),
+                    frameTime: perfMetrics.frameTime.toFixed(2),
+                    drawCalls: perfMetrics.drawCalls,
+                    triangles: perfMetrics.triangles,
+                    memory: perfMetrics.memory,
+                    organisms: organisms.length,
+                    renderer: renderer.info.render,
+                    gpu: renderer.getContext().getParameter(renderer.getContext().getExtension('WEBGL_debug_renderer_info').UNMASKED_RENDERER_WEBGL)
+                };
+
+                const blob = new Blob([JSON.stringify(benchData, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `planet-eden-benchmark-${Date.now()}.json`;
+                a.click();
+
+                showNotification('⚡ Benchmark data exported');
+                playSound(1000, 150);
+            }
+
+            // Code Viewer
+            document.getElementById('close-code-viewer').addEventListener('click', () => {
+                document.getElementById('code-viewer-modal').classList.remove('show');
+                playSound(500, 80);
+            });
+
+            // Benchmark Modal
+            document.getElementById('close-benchmark').addEventListener('click', () => {
+                document.getElementById('benchmark-results').classList.remove('show');
+                playSound(500, 80);
+            });
+
+            document.getElementById('share-benchmark').addEventListener('click', () => {
+                const score = document.getElementById('benchmark-score').textContent;
+                const text = `I scored ${score} on Planet Eden Performance Benchmark! 🌍⚡\\n\\nhttps://markjspivey-xwisee.github.io/planet-eden/`;
+
+                navigator.clipboard.writeText(text).then(() => {
+                    showNotification('📋 Benchmark copied to clipboard!');
+                    playSound(1000, 150);
+                });
+            });
+
+            // Run Performance Benchmark
+            function runBenchmark() {
+                showNotification('⚡ Running benchmark...');
+                playSound(700, 100);
+
+                const benchStart = performance.now();
+                let frameCount = 0;
+                let totalFrameTime = 0;
+                const duration = 5000; // 5 second benchmark
+
+                const benchInterval = setInterval(() => {
+                    frameCount++;
+                    totalFrameTime += perfMetrics.frameTime;
+
+                    if (performance.now() - benchStart >= duration) {
+                        clearInterval(benchInterval);
+
+                        const avgFPS = Math.round(frameCount / (duration / 1000));
+                        const avgFrameTime = (totalFrameTime / frameCount).toFixed(2);
+                        const score = Math.round(avgFPS * (organisms.length / 100) * (1000 / avgFrameTime));
+
+                        document.getElementById('benchmark-score').textContent = score;
+                        document.getElementById('bench-fps').textContent = avgFPS;
+                        document.getElementById('bench-frame-time').textContent = avgFrameTime + 'ms';
+                        document.getElementById('bench-entities').textContent = organisms.length;
+
+                        try {
+                            const gl = renderer.getContext();
+                            const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+                            const gpu = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+                            document.getElementById('bench-gpu').textContent = gpu.substring(0, 30);
+                        } catch (e) {
+                            document.getElementById('bench-gpu').textContent = 'Unknown';
+                        }
+
+                        let rating = 'Poor';
+                        if (score > 5000) rating = 'Excellent! 🏆';
+                        else if (score > 3000) rating = 'Very Good 🌟';
+                        else if (score > 1500) rating = 'Good ✓';
+                        else if (score > 800) rating = 'Fair';
+
+                        document.getElementById('benchmark-rating').textContent = rating;
+                        document.getElementById('benchmark-results').classList.add('show');
+
+                        playSound(1200, 300);
+                    }
+                }, 16);
+            }
+
+            // Matrix Mode Easter Egg
+            function activateMatrixMode() {
+                showNotification('🎮 Matrix Mode Activated!');
+                playSound(1500, 500);
+
+                const canvas = document.getElementById('matrix-rain');
+                canvas.classList.add('active');
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+                const ctx = canvas.getContext('2d');
+
+                const chars = 'ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ01';
+                const fontSize = 14;
+                const columns = canvas.width / fontSize;
+                const drops = Array(Math.floor(columns)).fill(1);
+
+                let matrixInterval = setInterval(() => {
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.fillStyle = '#0F0';
+                    ctx.font = fontSize + 'px monospace';
+
+                    for (let i = 0; i < drops.length; i++) {
+                        const text = chars[Math.floor(Math.random() * chars.length)];
+                        ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+
+                        if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+                            drops[i] = 0;
+                        }
+                        drops[i]++;
+                    }
+                }, 33);
+
+                // Auto-disable after 10 seconds
+                setTimeout(() => {
+                    clearInterval(matrixInterval);
+                    canvas.classList.remove('active');
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    showNotification('Matrix Mode Deactivated');
+                }, 10000);
+            }
+
+            // Update Performance Metrics
+            function updateDevMetrics() {
+                if (!devConsole.visible) return;
+
+                // Get renderer info
+                const info = renderer.info;
+                perfMetrics.drawCalls = info.render.calls;
+                perfMetrics.triangles = info.render.triangles;
+
+                // Memory estimate
+                if (performance.memory) {
+                    perfMetrics.memory = (performance.memory.usedJSHeapSize / 1048576).toFixed(1);
+                }
+
+                // Update UI
+                document.getElementById('metric-frame-time').textContent = perfMetrics.frameTime.toFixed(2) + 'ms';
+                document.getElementById('metric-draw-calls').textContent = perfMetrics.drawCalls;
+                document.getElementById('metric-triangles').textContent = perfMetrics.triangles.toLocaleString();
+                document.getElementById('metric-particles').textContent = activeEffects.length;
+                document.getElementById('metric-memory').textContent = perfMetrics.memory;
+
+                // Entity stats
+                const living = organisms.filter(o => !o.dead).length;
+                const avgGen = organisms.length > 0 ? organisms.reduce((sum, o) => sum + o.generation, 0) / organisms.length : 0;
+
+                document.getElementById('metric-total-organisms').textContent = organisms.length;
+                document.getElementById('metric-living').textContent = living;
+                document.getElementById('metric-dead').textContent = organisms.length - living;
+                document.getElementById('metric-avg-gen').textContent = avgGen.toFixed(1);
+                document.getElementById('metric-grid-cells').textContent = spatialGrid.gridSize * spatialGrid.gridSize;
+            }
+
+            // Add keyboard shortcut hints to help panel
+            const originalHelpContent = document.getElementById('help-panel').querySelector('.shortcut-list').innerHTML;
+            document.getElementById('help-panel').querySelector('.shortcut-list').innerHTML = originalHelpContent + `
+                <div><span>F3</span><span>Developer Console</span></div>
+                <div><span>Ctrl+Shift+B</span><span>Run Benchmark</span></div>
+                <div><span>Konami Code</span><span>Matrix Mode 🎮</span></div>
+            `;
+
             // Show welcome screen on first load
             showWelcomeScreen();
 
@@ -3253,7 +4388,8 @@
             function animate() {
                 requestAnimationFrame(animate);
 
-                const currentTime = performance.now();
+                const frameStart = performance.now();
+                const currentTime = frameStart;
                 const delta = ((currentTime - lastTime) / 1000) * state.speed;
                 lastTime = currentTime;
 
@@ -3272,6 +4408,11 @@
                 updateParticleEffects(delta);
 
                 updateUI();
+
+                // Track frame time for dev console
+                perfMetrics.frameTime = performance.now() - frameStart;
+                updateDevMetrics();
+
                 renderer.render(scene, camera);
             }
 
