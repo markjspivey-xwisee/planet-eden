@@ -8,16 +8,21 @@ Planet Eden now includes **comprehensive developer tools** specifically designed
 
 ## 🎯 Quick Access
 
-- **F3** - Toggle Developer Console
-- **Ctrl+Shift+B** - Run Performance Benchmark
-- **Konami Code** (↑↑↓↓←→←→BA) - Matrix Mode Easter Egg
-- **🔧 Button** (bottom-right) - Toggle Developer Tools
+Click the **⚙️** button (bottom-right) to access the developer tools menu:
+
+- **📊 Performance** - Toggle Developer Console
+- **⚡ Benchmark** - Run Performance Benchmark
+- **🔧 Settings** - Adjust live parameters
+- **📜 View Code** - See implementation examples
+- **💾 Export** - Download data and benchmarks
+
+All features are accessible via touch-friendly on-screen buttons - perfect for mobile and desktop!
 
 ---
 
 ## Features Implemented
 
-### 1. Developer Console (F3)
+### 1. Developer Console (📊 Performance Button)
 
 A comprehensive debugging overlay with 4 tabs:
 
@@ -78,7 +83,7 @@ Four export options:
 
 ### 3. Performance Benchmark Mode
 
-**Ctrl+Shift+B** triggers a 5-second standardized test:
+Click **⚡ Benchmark** from the developer menu to run a 5-second standardized test:
 
 **Metrics Collected:**
 - Average FPS over 5 seconds
@@ -114,19 +119,15 @@ Four export options:
 
 ---
 
-### 5. Easter Eggs
+### 5. On-Screen Interface
 
-#### Matrix Mode (Konami Code)
-- **Activation:** ↑↑↓↓←→←→BA
-- **Effect:** Full-screen Matrix-style character rain
-- **Duration:** 10 seconds
-- **Characters:** Japanese katakana + binary
+All developer features are accessible through touch-friendly on-screen buttons:
+- **Mobile-First Design** - No keyboard required
+- **Floating Action Menu** - Clean, unobtrusive interface
+- **Touch-Friendly Sizing** - 44px minimum tap targets
+- **Responsive Layout** - Adapts to any screen size
 
-**Tech Appeal:** Shows personality, technical fun
-
-#### Hidden Shortcuts
-- **Ctrl+Shift+B** - Benchmark (not obvious)
-- **F3** - Dev console (common in game engines)
+**Tech Appeal:** Shows modern UX design, accessibility focus
 
 ---
 
@@ -175,16 +176,18 @@ Time,Plants,Herbivores,Carnivores,Humanoids,Total,AvgGeneration
 
 ---
 
-## 🎮 Updated Keyboard Shortcuts
+## 🎮 On-Screen Controls
 
-### New Shortcuts
-| Key | Action |
-|-----|--------|
-| **F3** | Toggle Developer Console |
-| **Ctrl+Shift+B** | Run Performance Benchmark |
-| **Konami Code** | Activate Matrix Mode |
+### Developer Tools Menu (⚙️ button - bottom-right)
+| Button | Action |
+|--------|--------|
+| **📊 Performance** | Toggle Developer Console |
+| **⚡ Benchmark** | Run Performance Benchmark |
+| **🔧 Settings** | Adjust Live Parameters |
+| **📜 View Code** | See Implementation Examples |
+| **💾 Export** | Download Data/Benchmarks |
 
-### Existing Shortcuts
+### Existing Keyboard Shortcuts
 | Key | Action |
 |-----|--------|
 | **Space** | Pause/Resume |
@@ -265,9 +268,9 @@ When demoing to technical audiences:
    - Show the polished god mode gameplay
    - Demonstrate a few dramatic powers
 
-2. **Press F3**
+2. **Click the ⚙️ button**
    - "Here's what's happening under the hood"
-   - Show performance metrics
+   - Click **📊 Performance** to show metrics
    - "This runs at 60 FPS with 200+ AI agents"
 
 3. **Select an organism**
@@ -276,21 +279,24 @@ When demoing to technical audiences:
    - "You can export and analyze the weights"
 
 4. **Tweak parameters live**
-   - Adjust mutation rate
+   - Click **🔧 Settings** from the developer menu
+   - Adjust mutation rate with the slider
    - "Watch evolution speed up in real-time"
 
 5. **Run benchmark**
-   - Ctrl+Shift+B
+   - Click **⚡ Benchmark** from the developer menu
    - "Let's measure performance scientifically"
    - Share the score
 
 6. **Export data**
+   - Click **💾 Export** from the developer menu
    - Show JSON export
    - "Perfect for research or ML training"
 
-7. **Konami Code finale**
-   - If audience is game-savvy
-   - Shows attention to detail
+7. **Mobile-friendly design**
+   - Show it works on any device
+   - "Touch-friendly, no keyboard required"
+   - Shows attention to accessibility
 
 ---
 
