@@ -2897,6 +2897,52 @@ class ParticleEffect {
                 cameraDistance = Math.max(80, Math.min(250, cameraDistance));
             });
 
+            // Touch controls for mobile
+            let touches = [];
+            let lastPinchDistance = 0;
+
+            renderer.domElement.addEventListener('touchstart', e => {
+                touches = Array.from(e.touches);
+                if (touches.length === 1) {
+                    isDragging = true;
+                    prevX = touches[0].clientX;
+                    prevY = touches[0].clientY;
+                } else if (touches.length === 2) {
+                    isDragging = false;
+                    const dx = touches[0].clientX - touches[1].clientX;
+                    const dy = touches[0].clientY - touches[1].clientY;
+                    lastPinchDistance = Math.sqrt(dx * dx + dy * dy);
+                }
+            });
+
+            renderer.domElement.addEventListener('touchmove', e => {
+                e.preventDefault();
+                touches = Array.from(e.touches);
+
+                if (touches.length === 1 && isDragging) {
+                    // Single finger drag - rotate camera
+                    cameraAngle += (touches[0].clientX - prevX) * 0.005;
+                    cameraHeight -= (touches[0].clientY - prevY) * 0.5;
+                    cameraHeight = Math.max(-80, Math.min(100, cameraHeight));
+                    prevX = touches[0].clientX;
+                    prevY = touches[0].clientY;
+                } else if (touches.length === 2) {
+                    // Two finger pinch - zoom
+                    const dx = touches[0].clientX - touches[1].clientX;
+                    const dy = touches[0].clientY - touches[1].clientY;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    const delta = distance - lastPinchDistance;
+                    cameraDistance -= delta * 0.5;
+                    cameraDistance = Math.max(80, Math.min(250, cameraDistance));
+                    lastPinchDistance = distance;
+                }
+            }, { passive: false });
+
+            renderer.domElement.addEventListener('touchend', () => {
+                isDragging = false;
+                touches = [];
+            });
+
             // Click selection
             const raycaster = new THREE.Raycaster();
             const mouse = new THREE.Vector2();
@@ -3066,6 +3112,16 @@ class ParticleEffect {
                     document.getElementById('herbivore-count').textContent = cachedCounts.herbivore;
                     document.getElementById('carnivore-count').textContent = cachedCounts.carnivore;
                     document.getElementById('humanoid-count').textContent = cachedCounts.humanoid;
+
+                    // Achievement checks
+                    const totalLiving = Object.values(cachedCounts).reduce((a, b) => a + b, 0);
+                    if (totalLiving >= 100) checkAchievement('hundredCreatures');
+                    if (totalLiving === 0 && organisms.length > 0) checkAchievement('extinction');
+                    if (organisms.length > 0) checkAchievement('firstCreature');
+
+                    // Check max generation
+                    const maxGen = Math.max(...organisms.map(o => o.generation));
+                    if (maxGen >= 100) checkAchievement('evolution100');
                 }
 
                 document.getElementById('day-count').textContent = Math.floor(state.time / 60);
@@ -3085,7 +3141,14 @@ class ParticleEffect {
                 }
             }
 
-            const state = { time: 0, paused: false, speed: 1 };
+            const state = {
+                time: 0,
+                paused: false,
+                speed: 1,
+                dayTime: 0, // 0 to 1, represents time of day (0 = midnight, 0.5 = noon)
+                dayNightSpeed: 0.01, // How fast day cycles (1 = full cycle per second)
+                lastAutoSave: 0 // Track last auto-save time
+            };
 
             // ========== GOD MODE SYSTEM ==========
             const godMode = {
@@ -3108,6 +3171,28 @@ class ParticleEffect {
 
             // Active particle effects
             const activeEffects = [];
+
+            // ========== ACHIEVEMENT SYSTEM ==========
+            const achievements = {
+                firstCreature: { name: '🌱 First Life', desc: 'Spawn your first creature', unlocked: false },
+                hundredCreatures: { name: '🌿 Thriving World', desc: 'Have 100+ organisms alive', unlocked: false },
+                extinction: { name: '💀 Extinction Event', desc: 'Kill all organisms', unlocked: false },
+                godOfLife: { name: '✨ God of Life', desc: 'Use Resurrect power', unlocked: false },
+                meteorStrike: { name: '☄️ Divine Wrath', desc: 'Use Meteor Strike', unlocked: false },
+                evolution100: { name: '🧬 Evolution Master', desc: 'Reach generation 100', unlocked: false },
+                balance: { name: '⚖️ Perfect Balance', desc: 'Balance the ecosystem', unlocked: false },
+                nightOwl: { name: '🌙 Night Owl', desc: 'Witness the night', unlocked: false },
+                sunrise: { name: '🌅 New Dawn', desc: 'See the sunrise', unlocked: false },
+                terraform: { name: '🏔️ World Shaper', desc: 'Terraform terrain', unlocked: false }
+            };
+
+            function checkAchievement(key) {
+                if (!achievements[key].unlocked) {
+                    achievements[key].unlocked = true;
+                    showNotification(`🏆 Achievement: ${achievements[key].name}`);
+                    playSound(1200, 200);
+                }
+            }
 
             // Power Definitions
             const POWERS = {
@@ -3163,6 +3248,7 @@ class ParticleEffect {
                         }
                         createGlowEffect(organism, 0x00FFFF, 2000);
                         showNotification(`🌟 Resurrected ${organism.type} #${organism.id}`);
+                        checkAchievement('godOfLife');
                     }
                 },
                 'evolve': {
@@ -3220,6 +3306,7 @@ class ParticleEffect {
                         }
                         showNotification(`☄️ Meteor strike! Killed ${killed} organisms`);
                         playSound(100, 500);
+                        checkAchievement('meteorStrike');
                     }
                 },
                 'lightning': {
@@ -3309,6 +3396,7 @@ class ParticleEffect {
                     execute: (position) => {
                         modifyTerrain(position, godMode.settings.brushSize, godMode.settings.terraformStrength);
                         showNotification(`⛰️ Raised terrain`);
+                        checkAchievement('terraform');
                     }
                 },
                 'lower': {
@@ -3399,6 +3487,7 @@ class ParticleEffect {
                             }
                         }
                         showNotification(`⚖️ Balanced ecosystem! ${changes} changes`);
+                        checkAchievement('balance');
                     }
                 },
                 'surplus': {
@@ -4176,7 +4265,9 @@ class ParticleEffect {
                 frameTime: 0,
                 drawCalls: 0,
                 triangles: 0,
-                memory: 0
+                memory: 0,
+                fps: 60,
+                fpsHistory: [] // Track last 60 FPS samples for graph
             };
 
             // Developer Settings (live tweakable parameters)
@@ -4570,12 +4661,66 @@ class ParticleEffect {
                     perfMetrics.memory = (performance.memory.usedJSHeapSize / 1048576).toFixed(1);
                 }
 
+                // Calculate FPS
+                perfMetrics.fps = perfMetrics.frameTime > 0 ? Math.round(1000 / perfMetrics.frameTime) : 60;
+                perfMetrics.fpsHistory.push(perfMetrics.fps);
+                if (perfMetrics.fpsHistory.length > 60) perfMetrics.fpsHistory.shift();
+
                 // Update UI
                 document.getElementById('metric-frame-time').textContent = perfMetrics.frameTime.toFixed(2) + 'ms';
                 document.getElementById('metric-draw-calls').textContent = perfMetrics.drawCalls;
                 document.getElementById('metric-triangles').textContent = perfMetrics.triangles.toLocaleString();
                 document.getElementById('metric-particles').textContent = activeEffects.length;
                 document.getElementById('metric-memory').textContent = perfMetrics.memory;
+
+                // Draw performance graph
+                const perfCanvas = document.getElementById('performance-graph');
+                const perfCtx = perfCanvas.getContext('2d');
+                perfCanvas.width = 600;
+                perfCanvas.height = 150;
+
+                perfCtx.clearRect(0, 0, perfCanvas.width, perfCanvas.height);
+
+                // Draw grid
+                perfCtx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+                perfCtx.lineWidth = 1;
+                for (let i = 0; i <= 60; i += 10) {
+                    const y = perfCanvas.height - (i / 60) * perfCanvas.height;
+                    perfCtx.beginPath();
+                    perfCtx.moveTo(0, y);
+                    perfCtx.lineTo(perfCanvas.width, y);
+                    perfCtx.stroke();
+                }
+
+                // Draw FPS line
+                if (perfMetrics.fpsHistory.length > 1) {
+                    perfCtx.strokeStyle = 'rgba(0, 212, 255, 0.8)';
+                    perfCtx.lineWidth = 2;
+                    perfCtx.beginPath();
+
+                    const step = perfCanvas.width / 60;
+                    perfMetrics.fpsHistory.forEach((fps, i) => {
+                        const x = i * step;
+                        const y = perfCanvas.height - (Math.min(fps, 60) / 60) * perfCanvas.height;
+                        if (i === 0) perfCtx.moveTo(x, y);
+                        else perfCtx.lineTo(x, y);
+                    });
+                    perfCtx.stroke();
+
+                    // Fill area under curve
+                    perfCtx.lineTo(perfMetrics.fpsHistory.length * step, perfCanvas.height);
+                    perfCtx.lineTo(0, perfCanvas.height);
+                    perfCtx.closePath();
+                    perfCtx.fillStyle = 'rgba(0, 212, 255, 0.2)';
+                    perfCtx.fill();
+                }
+
+                // Draw labels
+                perfCtx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+                perfCtx.font = '10px monospace';
+                perfCtx.fillText('60 FPS', 5, 12);
+                perfCtx.fillText('30 FPS', 5, perfCanvas.height / 2 + 4);
+                perfCtx.fillText('0 FPS', 5, perfCanvas.height - 4);
 
                 // Entity stats
                 const living = organisms.filter(o => !o.dead).length;
@@ -4702,7 +4847,79 @@ class ParticleEffect {
                     state.time += delta;
                     planetGroup.rotation.y += 0.0002 * delta;
                     updateEcosystem(delta);
+
+                    // Day/Night Cycle
+                    const prevDayTime = state.dayTime;
+                    state.dayTime = (state.dayTime + delta * state.dayNightSpeed) % 1;
+
+                    // Check for day/night achievements
+                    if (prevDayTime < 0.5 && state.dayTime >= 0.5) checkAchievement('sunrise');
+                    if (prevDayTime < 0.95 && state.dayTime >= 0.95) checkAchievement('nightOwl');
+
+                    // Auto-save every 2 minutes
+                    if (state.time - state.lastAutoSave > 120) {
+                        state.lastAutoSave = state.time;
+                        const worldState = {
+                            time: state.time,
+                            dayTime: state.dayTime,
+                            organisms: organisms.map(o => ({
+                                type: o.type,
+                                position: {x: o.position.x, y: o.position.y, z: o.position.z},
+                                energy: o.energy,
+                                health: o.health,
+                                age: o.age,
+                                generation: o.generation,
+                                dead: o.dead
+                            }))
+                        };
+                        localStorage.setItem('planetEdenAutoSave', JSON.stringify(worldState));
+                    }
                 }
+
+                // Update lighting based on time of day
+                const sunPhase = Math.sin(state.dayTime * Math.PI * 2); // -1 to 1
+                const lightIntensity = Math.max(0.3, (sunPhase + 1) * 0.6); // 0.3 to 1.5
+
+                sunLight.intensity = lightIntensity * 1.8;
+                ambientLight.intensity = lightIntensity * 0.6;
+
+                // Change sun color based on time (warmer at sunrise/sunset)
+                const isRising = state.dayTime < 0.25 || state.dayTime > 0.75;
+                const sunsetStrength = isRising ? Math.abs(Math.cos(state.dayTime * Math.PI * 4)) : 0;
+                const sunColor = new THREE.Color().lerpColors(
+                    new THREE.Color(0xffffee), // Day color
+                    new THREE.Color(0xff8844), // Sunset color
+                    sunsetStrength
+                );
+                sunLight.color = sunColor;
+
+                // Move sun position
+                const sunAngle = state.dayTime * Math.PI * 2;
+                sunLight.position.x = Math.cos(sunAngle) * 200;
+                sunLight.position.y = Math.sin(sunAngle) * 200;
+                sunLight.position.z = -100;
+
+                // Change background color
+                const skyColorDay = new THREE.Color(0x87ceeb);
+                const skyColorNight = new THREE.Color(0x0a0a1a);
+                const skyColorSunset = new THREE.Color(0x4a2a5a);
+
+                let skyColor;
+                if (sunPhase > 0.7) {
+                    // Day
+                    skyColor = skyColorDay;
+                } else if (sunPhase < -0.7) {
+                    // Night
+                    skyColor = skyColorNight;
+                } else {
+                    // Sunrise/Sunset
+                    const t = (sunPhase + 0.7) / 1.4; // 0 to 1
+                    skyColor = new THREE.Color().lerpColors(skyColorNight, skyColorDay, t);
+                    if (Math.abs(sunPhase) < 0.3) {
+                        skyColor.lerp(skyColorSunset, (0.3 - Math.abs(sunPhase)) / 0.3);
+                    }
+                }
+                scene.background = skyColor;
 
                 camera.position.x = Math.cos(cameraAngle) * cameraDistance;
                 camera.position.z = Math.sin(cameraAngle) * cameraDistance;
