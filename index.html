@@ -4589,17 +4589,98 @@ class ParticleEffect {
 
                 // Neural network display (if organism selected)
                 const neuralWeights = document.getElementById('neural-weights');
+                const nnCanvas = document.getElementById('neural-network-viz');
+                const nnCtx = nnCanvas.getContext('2d');
+
                 if (selected && selected.brain && !selected.dead) {
                     const weights = selected.brain.weights;
+
+                    // Draw neural network visualization
+                    nnCanvas.width = 600;
+                    nnCanvas.height = 300;
+                    nnCtx.clearRect(0, 0, nnCanvas.width, nnCanvas.height);
+
+                    const inputCount = 8; // Perception inputs
+                    const hiddenCount = Math.ceil(weights.length / 2);
+                    const outputCount = 3; // Movement outputs
+
+                    const drawNeuron = (x, y, active) => {
+                        nnCtx.beginPath();
+                        nnCtx.arc(x, y, 8, 0, Math.PI * 2);
+                        nnCtx.fillStyle = active ? 'rgba(0, 212, 255, 0.8)' : 'rgba(100, 100, 100, 0.5)';
+                        nnCtx.fill();
+                        nnCtx.strokeStyle = 'rgba(0, 212, 255, 0.4)';
+                        nnCtx.lineWidth = 2;
+                        nnCtx.stroke();
+                    };
+
+                    const drawConnection = (x1, y1, x2, y2, weight) => {
+                        const alpha = Math.min(Math.abs(weight), 1);
+                        const color = weight > 0 ? `rgba(0, 255, 100, ${alpha * 0.6})` : `rgba(255, 50, 50, ${alpha * 0.6})`;
+                        nnCtx.strokeStyle = color;
+                        nnCtx.lineWidth = Math.abs(weight) * 2;
+                        nnCtx.beginPath();
+                        nnCtx.moveTo(x1, y1);
+                        nnCtx.lineTo(x2, y2);
+                        nnCtx.stroke();
+                    };
+
+                    // Input layer
+                    const inputX = 50;
+                    const inputSpacing = nnCanvas.height / (inputCount + 1);
+                    for (let i = 0; i < inputCount; i++) {
+                        const y = inputSpacing * (i + 1);
+                        drawNeuron(inputX, y, true);
+                    }
+
+                    // Hidden layer
+                    const hiddenX = 250;
+                    const hiddenSpacing = nnCanvas.height / (hiddenCount + 1);
+                    for (let i = 0; i < hiddenCount; i++) {
+                        const y = hiddenSpacing * (i + 1);
+                        drawNeuron(hiddenX, y, true);
+
+                        // Draw connections from inputs to hidden
+                        for (let j = 0; j < inputCount; j++) {
+                            const inputY = inputSpacing * (j + 1);
+                            const weightIdx = (i * inputCount + j) % weights.length;
+                            drawConnection(inputX, inputY, hiddenX, y, weights[weightIdx]);
+                        }
+                    }
+
+                    // Output layer
+                    const outputX = 500;
+                    const outputSpacing = nnCanvas.height / (outputCount + 1);
+                    for (let i = 0; i < outputCount; i++) {
+                        const y = outputSpacing * (i + 1);
+                        drawNeuron(outputX, y, true);
+
+                        // Draw connections from hidden to output
+                        for (let j = 0; j < hiddenCount; j++) {
+                            const hiddenY = hiddenSpacing * (j + 1);
+                            const weightIdx = (inputCount * hiddenCount + i * hiddenCount + j) % weights.length;
+                            drawConnection(hiddenX, hiddenY, outputX, y, weights[weightIdx]);
+                        }
+                    }
+
+                    // Labels
+                    nnCtx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+                    nnCtx.font = '12px monospace';
+                    nnCtx.fillText('Inputs', inputX - 20, 20);
+                    nnCtx.fillText('Hidden', hiddenX - 20, 20);
+                    nnCtx.fillText('Outputs', outputX - 25, 20);
+
+                    // Weight list
                     neuralWeights.innerHTML = `
                         <strong style="color: var(--text-bright);">Organism #${selected.id} (${selected.type})</strong><br>
                         <span style="color: var(--text-dim);">Generation: ${selected.generation} | Weights: ${weights.length}</span><br><br>
                         <strong style="color: var(--accent-blue);">Neural Network Weights:</strong><br>
-                        <code style="color: var(--text-bright); display: block; max-height: 200px; overflow-y: auto; background: rgba(0,0,0,0.3); padding: 8px; border-radius: 4px; margin-top: 4px;">
+                        <code style="color: var(--text-bright); display: block; max-height: 150px; overflow-y: auto; background: rgba(0,0,0,0.3); padding: 8px; border-radius: 4px; margin-top: 4px; font-size: 9px;">
                             ${weights.map((w, i) => `w[${i}]: ${w.toFixed(4)}`).join('<br>')}
                         </code>
                     `;
                 } else {
+                    nnCtx.clearRect(0, 0, nnCanvas.width, nnCanvas.height);
                     neuralWeights.innerHTML = '<span style="color: var(--text-dim);">Select a living organism to view its neural network</span>';
                 }
             }
