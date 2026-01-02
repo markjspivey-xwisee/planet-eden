@@ -1975,42 +1975,60 @@ class ParticleEffect {
                     </div>
 
                     <div style="margin-bottom: 1.5rem; background: rgba(0, 100, 200, 0.15); padding: 1rem; border-radius: 8px; border-left: 3px solid var(--border-bright);">
-                        <h3 style="color: var(--text-bright); font-size: 1.2rem; margin-bottom: 0.5rem;">👁️ INPUTS: What the Brain Sees (5 values)</h3>
-                        <ul style="color: var(--text-normal); line-height: 1.8; padding-left: 1.5rem;">
+                        <h3 style="color: var(--text-bright); font-size: 1.2rem; margin-bottom: 0.5rem;">👁️ INPUTS: What the Brain Sees (8 values)</h3>
+                        <ul style="color: var(--text-normal); line-height: 1.6; padding-left: 1.5rem; font-size: 0.95rem;">
                             <li><strong>Energy:</strong> How hungry am I? (0-100%)</li>
                             <li><strong>Health:</strong> How injured am I? (0-100%)</li>
                             <li><strong>Food Nearby:</strong> Is there food close? (0-100%)</li>
                             <li><strong>Predator Nearby:</strong> Am I in danger? (0-100%)</li>
                             <li><strong>Prey Nearby:</strong> Can I hunt? (0-100%)</li>
+                            <li><strong>Age:</strong> How old am I? (0-100%)</li>
+                            <li><strong>Social Density:</strong> How many of my kind are nearby? (0-100%)</li>
+                            <li><strong>Generation:</strong> How evolved is my lineage? (0-100%)</li>
                         </ul>
                     </div>
 
                     <div style="margin-bottom: 1.5rem; background: rgba(100, 0, 200, 0.15); padding: 1rem; border-radius: 8px; border-left: 3px solid #a000ff;">
                         <h3 style="color: var(--text-bright); font-size: 1.2rem; margin-bottom: 0.5rem;">🔗 PROCESSING: The "Think" Process</h3>
                         <p style="color: var(--text-normal); line-height: 1.6;">
-                            The brain has <strong>20-40 "connections"</strong> (called weights) that process the inputs.
+                            The brain has <strong>64-128 "connections"</strong> (called weights) that process the inputs.
                             Each connection multiplies an input by a number, and all these results are combined together.
                             This is similar to how your brain cells connect and communicate!
                         </p>
                         <p style="color: var(--text-dim); font-size: 0.9rem; margin-top: 0.5rem; font-style: italic;">
                             Example: If energy is low (10%) and food is nearby (80%), the weights multiply these values
-                            and combine them to decide "I should move fast toward food!"
+                            and combine them to decide "I should eat this food immediately!"
                         </p>
                     </div>
 
                     <div style="margin-bottom: 1.5rem; background: rgba(0, 200, 100, 0.15); padding: 1rem; border-radius: 8px; border-left: 3px solid #00ff88;">
-                        <h3 style="color: var(--text-bright); font-size: 1.2rem; margin-bottom: 0.5rem;">🏃 OUTPUTS: Full 3D Movement Control</h3>
-                        <p style="color: var(--text-normal); line-height: 1.6;">
-                            After processing, the brain outputs <strong>3 values</strong>:
+                        <h3 style="color: var(--text-bright); font-size: 1.2rem; margin-bottom: 0.5rem;">🎮 OUTPUTS: FULL AUTONOMOUS CONTROL (8 decisions)</h3>
+                        <p style="color: var(--text-normal); line-height: 1.6; margin-bottom: 0.5rem;">
+                            After processing, the brain outputs <strong>8 values</strong> controlling ALL behavior:
                         </p>
-                        <ul style="color: var(--text-normal); line-height: 1.8; padding-left: 1.5rem; margin-top: 0.5rem;">
-                            <li><strong>Move X:</strong> Sideways movement (-100% to +100%)</li>
-                            <li><strong>Move Y:</strong> Up/down movement (-100% to +100%)</li>
-                            <li><strong>Move Z:</strong> Forward/backward movement (-100% to +100%)</li>
-                        </ul>
-                        <p style="color: var(--text-normal); line-height: 1.6; margin-top: 0.5rem;">
-                            The brain has <strong>FULL CONTROL</strong> - it decides where to go and how fast!
-                            There are <strong>NO hard-coded rules</strong> - all behavior emerges from the neural network.
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.9rem;">
+                            <div>
+                                <strong style="color: #0f0;">Movement (3D):</strong>
+                                <ul style="color: var(--text-normal); padding-left: 1.2rem; margin: 0.2rem 0;">
+                                    <li>Move X (lateral)</li>
+                                    <li>Move Y (vertical)</li>
+                                    <li>Move Z (forward/back)</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <strong style="color: #0af;">Behavior:</strong>
+                                <ul style="color: var(--text-normal); padding-left: 1.2rem; margin: 0.2rem 0;">
+                                    <li>Speed modifier</li>
+                                    <li>Should eat?</li>
+                                    <li>Should attack?</li>
+                                    <li>Should reproduce?</li>
+                                    <li>Social (seek/avoid)</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <p style="color: var(--text-normal); line-height: 1.6; margin-top: 0.8rem; padding-top: 0.8rem; border-top: 1px solid rgba(255,255,255,0.1);">
+                            <strong style="color: #ff6;">🚀 TRUE AUTONOMY:</strong> The brain controls EVERYTHING - no hard-coded survival rules!
+                            Creatures must <em>evolve</em> strategies for eating, attacking, reproducing, and social behavior.
                         </p>
                     </div>
 
@@ -2466,23 +2484,28 @@ class ParticleEffect {
             // ========== ORGANISMS ==========
             class Brain {
                 constructor(complexity = 1) {
-                    // Create weights for 3 outputs (moveX, moveY, moveZ)
-                    // Each output has its own set of weights
+                    // Create weights for 8 outputs (FULL AUTONOMOUS CONTROL)
+                    // 0-2: moveX, moveY, moveZ (movement direction)
+                    // 3: speedModifier (how fast to move)
+                    // 4: shouldEat (whether to eat available food)
+                    // 5: shouldAttack (whether to attack nearby prey)
+                    // 6: shouldReproduce (whether to attempt reproduction)
+                    // 7: socialAttraction (seek vs avoid same-type organisms)
                     this.weights = [];
-                    const weightsPerOutput = 5; // 5 inputs per output
-                    for (let output = 0; output < 3; output++) {
+                    const weightsPerOutput = 8; // 8 inputs per output
+                    for (let output = 0; output < 8; output++) {
                         this.weights[output] = Array(weightsPerOutput * complexity).fill(0).map(() => Math.random() * 2 - 1);
                     }
                 }
 
                 think(inputs) {
-                    // Return 3 outputs: moveX, moveY, moveZ
+                    // Return 8 outputs for FULL AUTONOMOUS CONTROL
                     const outputs = [];
-                    for (let i = 0; i < 3; i++) {
+                    for (let i = 0; i < 8; i++) {
                         const sum = inputs.reduce((s, input, j) => s + input * this.weights[i][j % this.weights[i].length], 0);
                         outputs.push(Math.tanh(sum));
                     }
-                    return outputs; // Returns [moveX, moveY, moveZ]
+                    return outputs; // [moveX, moveY, moveZ, speed, eat, attack, reproduce, social]
                 }
 
                 clone() {
@@ -2493,7 +2516,7 @@ class ParticleEffect {
 
                 mutate() {
                     // Mutate a random weight in a random output
-                    const outputIdx = Math.floor(Math.random() * 3);
+                    const outputIdx = Math.floor(Math.random() * 8);
                     const weightIdx = Math.floor(Math.random() * this.weights[outputIdx].length);
                     this.weights[outputIdx][weightIdx] += (Math.random() - 0.5) * 0.4;
                 }
@@ -2522,6 +2545,16 @@ class ParticleEffect {
                     this.deathTime = 0; // Track time since death for decay
                     // Randomize initial timer to prevent synchronized reproduction
                     this.reproduceTimer = Math.random() * 50;
+
+                    // Store brain's last decisions for behavior control
+                    this.brainDecisions = {
+                        moveX: 0, moveY: 0, moveZ: 0,
+                        speedModifier: 0.5,
+                        shouldEat: 0.5,
+                        shouldAttack: 0.5,
+                        shouldReproduce: 0.5,
+                        socialAttraction: 0
+                    };
 
                     const sizes = { plant: 2.5, herbivore: 2, carnivore: 2.5, humanoid: 3 };
                     const speeds = { plant: 0, herbivore: 0.18, carnivore: 0.22, humanoid: 0.15 };
@@ -2693,22 +2726,63 @@ class ParticleEffect {
                         }
                     }
 
+                    // Count nearby same-type organisms for social behavior
+                    let nearbySameType = 0;
+                    nearby.forEach(o => {
+                        if (o.type === this.type && !o.dead) {
+                            nearbySameType++;
+                        }
+                    });
+
+                    // 8 INPUTS for full environmental awareness
                     const inputs = [
-                        this.energy / 100,
-                        this.health / 100,
-                        1 - Math.min(nearestFoodDist / 40, 1),
-                        1 - Math.min(nearestPredatorDist / 40, 1),
-                        1 - Math.min(nearestPreyDist / 40, 1)
+                        this.energy / 100,                           // 0: Energy level
+                        this.health / 100,                           // 1: Health level
+                        1 - Math.min(nearestFoodDist / 40, 1),      // 2: Food proximity
+                        1 - Math.min(nearestPredatorDist / 40, 1),  // 3: Predator proximity
+                        1 - Math.min(nearestPreyDist / 40, 1),      // 4: Prey proximity
+                        Math.min(this.age / 200, 1),                // 5: Age (normalized)
+                        Math.min(nearbySameType / 10, 1),           // 6: Social density
+                        Math.min(this.generation / 20, 1)           // 7: Generation (evolutionary progress)
                     ];
 
-                    // Get neural network outputs: [moveX, moveY, moveZ]
+                    // Get neural network outputs: [moveX, moveY, moveZ, speed, eat, attack, reproduce, social]
                     const outputs = this.brain.think(inputs);
 
-                    // FULL NEURAL NETWORK CONTROL - brain decides direction AND speed!
+                    // Store decisions for behavior control
+                    this.brainDecisions = {
+                        moveX: outputs[0],
+                        moveY: outputs[1],
+                        moveZ: outputs[2],
+                        speedModifier: (outputs[3] + 1) / 2,         // Convert from [-1,1] to [0,1]
+                        shouldEat: outputs[4],
+                        shouldAttack: outputs[5],
+                        shouldReproduce: outputs[6],
+                        socialAttraction: outputs[7]
+                    };
+
+                    // FULL NEURAL NETWORK CONTROL - brain decides EVERYTHING!
                     const normal = this.position.clone().normalize();
 
                     // Neural network outputs directly control movement direction
                     let targetDirection = new THREE.Vector3(outputs[0], outputs[1], outputs[2]);
+
+                    // Add social behavior - seek or avoid same-type organisms
+                    if (nearbySameType > 0 && Math.abs(outputs[7]) > 0.3) {
+                        const socialDir = new THREE.Vector3();
+                        nearby.forEach(o => {
+                            if (o.type === this.type && !o.dead) {
+                                const toOther = o.position.clone().sub(this.position);
+                                if (outputs[7] > 0) {
+                                    socialDir.add(toOther); // Seek others
+                                } else {
+                                    socialDir.sub(toOther); // Avoid others
+                                }
+                            }
+                        });
+                        socialDir.normalize().multiplyScalar(Math.abs(outputs[7]) * 0.3);
+                        targetDirection.add(socialDir);
+                    }
 
                     // Project onto tangent plane to keep organism on sphere surface
                     targetDirection.sub(normal.clone().multiplyScalar(targetDirection.dot(normal)));
@@ -2721,9 +2795,10 @@ class ParticleEffect {
 
                     targetDirection.normalize();
 
-                    // Movement magnitude is based on NN output strength
+                    // Movement magnitude is based on NN output strength AND speed modifier
                     const movementStrength = Math.sqrt(outputs[0]**2 + outputs[1]**2 + outputs[2]**2);
-                    this.velocity.copy(targetDirection.multiplyScalar(movementStrength * this.speed));
+                    const finalSpeed = this.speed * this.brainDecisions.speedModifier;
+                    this.velocity.copy(targetDirection.multiplyScalar(movementStrength * finalSpeed));
                 }
 
                 update(delta, spatialGrid) {
@@ -2816,11 +2891,14 @@ class ParticleEffect {
                 canReproduce() {
                     // Different requirements for plants vs animals
                     if (this.type === 'plant') {
-                        // Plants reproduce faster to sustain ecosystem
+                        // Plants reproduce faster to sustain ecosystem (no brain control)
                         return !this.dead && this.energy > 60 && this.reproduceTimer > 25;
                     } else {
-                        // Animals need more energy to reproduce (was energy>80, health>60, timer>50)
-                        return !this.dead && this.energy > 70 && this.health > 50 && this.reproduceTimer > 40;
+                        // BRAIN DECISION: Animals decide when to reproduce!
+                        // Must have minimum resources AND brain must want to reproduce
+                        const hasResources = !this.dead && this.energy > 50 && this.health > 40 && this.reproduceTimer > 30;
+                        const wantsToReproduce = this.brainDecisions.shouldReproduce > 0.5;
+                        return hasResources && wantsToReproduce;
                     }
                 }
 
@@ -2924,6 +3002,7 @@ class ParticleEffect {
                 for (const o of organisms) o.update(delta, spatialGrid);
 
                 // Collision detection using spatial grid (much faster than O(n²))
+                // NOW WITH BRAIN CONTROL - organisms decide whether to eat/attack!
                 for (const o of organisms) {
                     if (o.dead) continue;
 
@@ -2931,8 +3010,11 @@ class ParticleEffect {
                         const nearby = spatialGrid.getNearby(o.position);
                         for (const other of nearby) {
                             if (other.type === 'plant' && !other.dead && o.position.distanceTo(other.position) < 4) {
-                                o.eat(other);
-                                break;
+                                // BRAIN DECISION: Should I eat this food?
+                                if (o.brainDecisions.shouldEat > 0.5) {
+                                    o.eat(other);
+                                    break;
+                                }
                             }
                         }
                     }
@@ -2942,8 +3024,11 @@ class ParticleEffect {
                         for (const other of nearby) {
                             if ((other.type === 'herbivore' || other.type === 'humanoid') &&
                                 !other.dead && o.position.distanceTo(other.position) < 4) {
-                                o.eat(other);
-                                break;
+                                // BRAIN DECISION: Should I attack this prey?
+                                if (o.brainDecisions.shouldAttack > 0.5) {
+                                    o.eat(other);
+                                    break;
+                                }
                             }
                         }
                     }
@@ -3249,11 +3334,14 @@ class ParticleEffect {
                     let nearestFoodDist = Infinity;
                     let nearestPredatorDist = Infinity;
                     let nearestPreyDist = Infinity;
+                    let nearbySameType = 0;
 
                     const nearby = spatialGrid.getNearby(selected.position);
                     for (const o of nearby) {
                         if (o === selected || o.dead) continue;
                         const dist = selected.position.distanceTo(o.position);
+
+                        if (o.type === selected.type) nearbySameType++;
 
                         if (selected.type === 'herbivore' || selected.type === 'humanoid') {
                             if (o.type === 'plant' && dist < nearestFoodDist) nearestFoodDist = dist;
@@ -3264,34 +3352,39 @@ class ParticleEffect {
                         }
                     }
 
-                    // Neural network inputs
+                    // Neural network inputs (8 total for FULL AUTONOMY)
                     nnInputs = [
                         selected.energy / 100,
                         selected.health / 100,
                         1 - Math.min(nearestFoodDist / 40, 1),
                         1 - Math.min(nearestPredatorDist / 40, 1),
-                        1 - Math.min(nearestPreyDist / 40, 1)
+                        1 - Math.min(nearestPreyDist / 40, 1),
+                        Math.min(selected.age / 200, 1),
+                        Math.min(nearbySameType / 10, 1),
+                        Math.min(selected.generation / 20, 1)
                     ];
 
-                    // Neural network outputs: [moveX, moveY, moveZ]
+                    // Neural network outputs: [moveX, moveY, moveZ, speed, eat, attack, reproduce, social]
                     nnOutput = selected.brain.think(nnInputs);
 
                     // Describe what the brain is deciding
-                    const movementStrength = Math.sqrt(nnOutput[0]**2 + nnOutput[1]**2 + nnOutput[2]**2);
+                    const decisions = {
+                        moving: Math.sqrt(nnOutput[0]**2 + nnOutput[1]**2 + nnOutput[2]**2) > 0.3,
+                        eating: nnOutput[4] > 0.5,
+                        attacking: nnOutput[5] > 0.5,
+                        reproducing: nnOutput[6] > 0.5,
+                        social: Math.abs(nnOutput[7]) > 0.5 ? (nnOutput[7] > 0 ? 'seeking' : 'avoiding') : null
+                    };
 
-                    // Analyze dominant movement direction
-                    let dominantDir = '';
-                    const absOutputs = nnOutput.map(Math.abs);
-                    const maxIdx = absOutputs.indexOf(Math.max(...absOutputs));
+                    let actions = [];
+                    if (decisions.eating) actions.push('🍽️ Wants to eat');
+                    if (decisions.attacking) actions.push('⚔️ Wants to attack');
+                    if (decisions.reproducing) actions.push('💚 Wants to reproduce');
+                    if (decisions.social === 'seeking') actions.push('👥 Seeking others');
+                    if (decisions.social === 'avoiding') actions.push('🚶 Avoiding others');
+                    if (!actions.length) actions.push('🤔 Wandering');
 
-                    if (movementStrength > 0.3) {
-                        const dirs = ['lateral', 'vertical', 'forward/backward'];
-                        dominantDir = `Moving ${dirs[maxIdx]} at ${(movementStrength * 100).toFixed(0)}% power`;
-                    } else {
-                        dominantDir = `Nearly stationary (${(movementStrength * 100).toFixed(0)}% power)`;
-                    }
-
-                    behaviorDescription = `🧠 BRAIN DECISION: ${dominantDir}`;
+                    behaviorDescription = actions.join(', ');
                 }
 
                 document.getElementById('creature-info').innerHTML = `
@@ -3331,50 +3424,81 @@ class ParticleEffect {
                                 <button onclick="showNeuralNetworkExplanation()" style="background: rgba(0, 200, 255, 0.2); border: 1px solid rgba(0, 200, 255, 0.5); color: var(--text-bright); border-radius: 4px; padding: 0.2rem 0.5rem; cursor: pointer; font-size: 0.75rem;">ℹ️ What's this?</button>
                             </div>
 
-                            <div style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0.4rem;">INPUTS (What it sees):</div>
-                            <div style="font-size: 0.8rem; margin-bottom: 0.6rem;">
-                                <div style="display: flex; justify-content: space-between; margin: 0.2rem 0;">
-                                    <span style="color: var(--text-dim);">Energy Level:</span>
+                            <div style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0.4rem;">INPUTS (8 total - What it perceives):</div>
+                            <div style="font-size: 0.75rem; margin-bottom: 0.6rem;">
+                                <div style="display: flex; justify-content: space-between; margin: 0.15rem 0;">
+                                    <span style="color: var(--text-dim);">Energy:</span>
                                     <span style="color: ${nnInputs[0] > 0.7 ? '#0f0' : nnInputs[0] > 0.3 ? '#ff0' : '#f00'};">${(nnInputs[0] * 100).toFixed(0)}%</span>
                                 </div>
-                                <div style="display: flex; justify-content: space-between; margin: 0.2rem 0;">
-                                    <span style="color: var(--text-dim);">Health Level:</span>
+                                <div style="display: flex; justify-content: space-between; margin: 0.15rem 0;">
+                                    <span style="color: var(--text-dim);">Health:</span>
                                     <span style="color: ${nnInputs[1] > 0.7 ? '#0f0' : nnInputs[1] > 0.3 ? '#ff0' : '#f00'};">${(nnInputs[1] * 100).toFixed(0)}%</span>
                                 </div>
-                                <div style="display: flex; justify-content: space-between; margin: 0.2rem 0;">
+                                <div style="display: flex; justify-content: space-between; margin: 0.15rem 0;">
                                     <span style="color: var(--text-dim);">Food Nearby:</span>
-                                    <span style="color: ${nnInputs[2] > 0.5 ? '#0f0' : nnInputs[2] > 0.2 ? '#ff0' : '#f00'};">${(nnInputs[2] * 100).toFixed(0)}%</span>
+                                    <span style="color: ${nnInputs[2] > 0.5 ? '#0f0' : nnInputs[2] > 0.2 ? '#ff0' : '#888'};">${(nnInputs[2] * 100).toFixed(0)}%</span>
                                 </div>
-                                <div style="display: flex; justify-content: space-between; margin: 0.2rem 0;">
+                                <div style="display: flex; justify-content: space-between; margin: 0.15rem 0;">
                                     <span style="color: var(--text-dim);">Predator Nearby:</span>
                                     <span style="color: ${nnInputs[3] > 0.5 ? '#f00' : nnInputs[3] > 0.2 ? '#ff0' : '#0f0'};">${(nnInputs[3] * 100).toFixed(0)}%</span>
                                 </div>
-                                <div style="display: flex; justify-content: space-between; margin: 0.2rem 0;">
+                                <div style="display: flex; justify-content: space-between; margin: 0.15rem 0;">
                                     <span style="color: var(--text-dim);">Prey Nearby:</span>
                                     <span style="color: ${nnInputs[4] > 0.5 ? '#0f0' : '#888'};">${(nnInputs[4] * 100).toFixed(0)}%</span>
                                 </div>
+                                <div style="display: flex; justify-content: space-between; margin: 0.15rem 0;">
+                                    <span style="color: var(--text-dim);">Age:</span>
+                                    <span style="color: #8af;">${(nnInputs[5] * 100).toFixed(0)}%</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin: 0.15rem 0;">
+                                    <span style="color: var(--text-dim);">Social Density:</span>
+                                    <span style="color: #8af;">${(nnInputs[6] * 100).toFixed(0)}%</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin: 0.15rem 0;">
+                                    <span style="color: var(--text-dim);">Generation:</span>
+                                    <span style="color: #8af;">${(nnInputs[7] * 100).toFixed(0)}%</span>
+                                </div>
                             </div>
 
-                            <div style="font-size: 0.75rem; color: var(--text-dim); margin: 0.6rem 0 0.4rem;">OUTPUTS (Brain's 3D movement decision):</div>
-                            <div style="font-size: 0.8rem;">
-                                <div style="display: flex; justify-content: space-between; margin: 0.2rem 0;">
-                                    <span style="color: var(--text-dim);">Move X (lateral):</span>
-                                    <span style="color: ${nnOutput[0] > 0 ? '#0f0' : '#f88'};">${nnOutput[0] > 0 ? '+' : ''}${(nnOutput[0] * 100).toFixed(1)}%</span>
+                            <div style="font-size: 0.75rem; color: var(--text-dim); margin: 0.6rem 0 0.4rem;">OUTPUTS (8 total - Brain's FULL CONTROL):</div>
+                            <div style="font-size: 0.75rem;">
+                                <div style="background: rgba(0,255,0,0.05); border-left: 2px solid rgba(0,255,0,0.3); padding: 0.3rem; margin: 0.3rem 0;">
+                                    <div style="color: var(--text-dim); margin-bottom: 0.2rem;">Movement (3D direction):</div>
+                                    <div style="display: flex; justify-content: space-between; margin: 0.1rem 0;">
+                                        <span>X:</span>
+                                        <span style="color: ${nnOutput[0] > 0 ? '#0f0' : '#f88'};">${nnOutput[0] > 0 ? '+' : ''}${(nnOutput[0] * 100).toFixed(0)}%</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; margin: 0.1rem 0;">
+                                        <span>Y:</span>
+                                        <span style="color: ${nnOutput[1] > 0 ? '#0f0' : '#f88'};">${nnOutput[1] > 0 ? '+' : ''}${(nnOutput[1] * 100).toFixed(0)}%</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; margin: 0.1rem 0;">
+                                        <span>Z:</span>
+                                        <span style="color: ${nnOutput[2] > 0 ? '#0f0' : '#f88'};">${nnOutput[2] > 0 ? '+' : ''}${(nnOutput[2] * 100).toFixed(0)}%</span>
+                                    </div>
                                 </div>
                                 <div style="display: flex; justify-content: space-between; margin: 0.2rem 0;">
-                                    <span style="color: var(--text-dim);">Move Y (vertical):</span>
-                                    <span style="color: ${nnOutput[1] > 0 ? '#0f0' : '#f88'};">${nnOutput[1] > 0 ? '+' : ''}${(nnOutput[1] * 100).toFixed(1)}%</span>
+                                    <span style="color: var(--text-dim);">Speed Modifier:</span>
+                                    <span style="color: ${nnOutput[3] > 0 ? '#0f0' : '#f88'};">${(((nnOutput[3] + 1) / 2) * 100).toFixed(0)}%</span>
                                 </div>
                                 <div style="display: flex; justify-content: space-between; margin: 0.2rem 0;">
-                                    <span style="color: var(--text-dim);">Move Z (forward/back):</span>
-                                    <span style="color: ${nnOutput[2] > 0 ? '#0f0' : '#f88'};">${nnOutput[2] > 0 ? '+' : ''}${(nnOutput[2] * 100).toFixed(1)}%</span>
+                                    <span style="color: var(--text-dim);">Should Eat:</span>
+                                    <span style="color: ${nnOutput[4] > 0.5 ? '#0f0' : '#f00'};">${nnOutput[4] > 0.5 ? '✅ YES' : '❌ NO'} (${(nnOutput[4] * 50 + 50).toFixed(0)}%)</span>
                                 </div>
-                                <div style="display: flex; justify-content: space-between; margin: 0.4rem 0 0 0; padding-top: 0.4rem; border-top: 1px solid rgba(255,255,255,0.1);">
-                                    <span style="color: var(--text-dim);">Total Movement Power:</span>
-                                    <span style="color: var(--text-bright); font-weight: 600;">${(Math.sqrt(nnOutput[0]**2 + nnOutput[1]**2 + nnOutput[2]**2) * 100).toFixed(1)}%</span>
+                                <div style="display: flex; justify-content: space-between; margin: 0.2rem 0;">
+                                    <span style="color: var(--text-dim);">Should Attack:</span>
+                                    <span style="color: ${nnOutput[5] > 0.5 ? '#f00' : '#0f0'};">${nnOutput[5] > 0.5 ? '⚔️ YES' : '🕊️ NO'} (${(nnOutput[5] * 50 + 50).toFixed(0)}%)</span>
                                 </div>
-                                <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 0.4rem; font-style: italic;">
-                                    The brain processes 5 inputs through ${selected.brain.getTotalWeights()} connections to output 3D movement vectors.
+                                <div style="display: flex; justify-content: space-between; margin: 0.2rem 0;">
+                                    <span style="color: var(--text-dim);">Should Reproduce:</span>
+                                    <span style="color: ${nnOutput[6] > 0.5 ? '#0f0' : '#888'};">${nnOutput[6] > 0.5 ? '💚 YES' : '⏸️ NO'} (${(nnOutput[6] * 50 + 50).toFixed(0)}%)</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin: 0.2rem 0;">
+                                    <span style="color: var(--text-dim);">Social Behavior:</span>
+                                    <span style="color: ${Math.abs(nnOutput[7]) > 0.5 ? '#0af' : '#888'};">${nnOutput[7] > 0.5 ? '👥 SEEK' : nnOutput[7] < -0.5 ? '🚶 AVOID' : '😐 NEUTRAL'}</span>
+                                </div>
+                                <div style="font-size: 0.7rem; color: var(--text-dim); margin-top: 0.4rem; padding-top: 0.4rem; border-top: 1px solid rgba(255,255,255,0.1); font-style: italic;">
+                                    🧠 ${selected.brain.getTotalWeights()} total weights controlling ALL decisions (movement, speed, eating, attacking, reproduction, social behavior). Pure neural autonomy!
                                 </div>
                             </div>
                         </div>
