@@ -1999,11 +1999,18 @@ class ParticleEffect {
                     </div>
 
                     <div style="margin-bottom: 1.5rem; background: rgba(0, 200, 100, 0.15); padding: 1rem; border-radius: 8px; border-left: 3px solid #00ff88;">
-                        <h3 style="color: var(--text-bright); font-size: 1.2rem; margin-bottom: 0.5rem;">🏃 OUTPUT: Movement Decision</h3>
+                        <h3 style="color: var(--text-bright); font-size: 1.2rem; margin-bottom: 0.5rem;">🏃 OUTPUTS: Full 3D Movement Control</h3>
                         <p style="color: var(--text-normal); line-height: 1.6;">
-                            After processing, the brain outputs a <strong>movement speed</strong> (0-100%).
-                            Combined with hard-coded survival rules (seek food when hungry, flee from predators),
-                            this creates complex, life-like behavior!
+                            After processing, the brain outputs <strong>3 values</strong>:
+                        </p>
+                        <ul style="color: var(--text-normal); line-height: 1.8; padding-left: 1.5rem; margin-top: 0.5rem;">
+                            <li><strong>Move X:</strong> Sideways movement (-100% to +100%)</li>
+                            <li><strong>Move Y:</strong> Up/down movement (-100% to +100%)</li>
+                            <li><strong>Move Z:</strong> Forward/backward movement (-100% to +100%)</li>
+                        </ul>
+                        <p style="color: var(--text-normal); line-height: 1.6; margin-top: 0.5rem;">
+                            The brain has <strong>FULL CONTROL</strong> - it decides where to go and how fast!
+                            There are <strong>NO hard-coded rules</strong> - all behavior emerges from the neural network.
                         </p>
                     </div>
 
@@ -2459,23 +2466,40 @@ class ParticleEffect {
             // ========== ORGANISMS ==========
             class Brain {
                 constructor(complexity = 1) {
-                    this.weights = Array(20 * complexity).fill(0).map(() => Math.random() * 2 - 1);
+                    // Create weights for 3 outputs (moveX, moveY, moveZ)
+                    // Each output has its own set of weights
+                    this.weights = [];
+                    const weightsPerOutput = 5; // 5 inputs per output
+                    for (let output = 0; output < 3; output++) {
+                        this.weights[output] = Array(weightsPerOutput * complexity).fill(0).map(() => Math.random() * 2 - 1);
+                    }
                 }
 
                 think(inputs) {
-                    const sum = inputs.reduce((s, input, i) => s + input * this.weights[i % this.weights.length], 0);
-                    return Math.tanh(sum);
+                    // Return 3 outputs: moveX, moveY, moveZ
+                    const outputs = [];
+                    for (let i = 0; i < 3; i++) {
+                        const sum = inputs.reduce((s, input, j) => s + input * this.weights[i][j % this.weights[i].length], 0);
+                        outputs.push(Math.tanh(sum));
+                    }
+                    return outputs; // Returns [moveX, moveY, moveZ]
                 }
 
                 clone() {
                     const b = new Brain();
-                    b.weights = [...this.weights];
+                    b.weights = this.weights.map(w => [...w]);
                     return b;
                 }
 
                 mutate() {
-                    const i = Math.floor(Math.random() * this.weights.length);
-                    this.weights[i] += (Math.random() - 0.5) * 0.4;
+                    // Mutate a random weight in a random output
+                    const outputIdx = Math.floor(Math.random() * 3);
+                    const weightIdx = Math.floor(Math.random() * this.weights[outputIdx].length);
+                    this.weights[outputIdx][weightIdx] += (Math.random() - 0.5) * 0.4;
+                }
+
+                getTotalWeights() {
+                    return this.weights.reduce((sum, w) => sum + w.length, 0);
                 }
             }
 
@@ -2677,42 +2701,29 @@ class ParticleEffect {
                         1 - Math.min(nearestPreyDist / 40, 1)
                     ];
 
-                    const output = this.brain.think(inputs);
+                    // Get neural network outputs: [moveX, moveY, moveZ]
+                    const outputs = this.brain.think(inputs);
 
-                    // FIXED: Actually seek food/prey and flee predators!
+                    // FULL NEURAL NETWORK CONTROL - brain decides direction AND speed!
                     const normal = this.position.clone().normalize();
-                    let targetDirection = new THREE.Vector3();
 
-                    // Decide what to do based on situation
-                    const isHungry = this.energy < 70; // Seek food earlier to prevent starvation
-                    const inDanger = nearestPredatorDist < 15;
+                    // Neural network outputs directly control movement direction
+                    let targetDirection = new THREE.Vector3(outputs[0], outputs[1], outputs[2]);
 
-                    if (this.type === 'herbivore' || this.type === 'humanoid') {
-                        if (inDanger && nearestPredator) {
-                            // FLEE from predator
-                            targetDirection.subVectors(this.position, nearestPredator.position);
-                        } else if (isHungry && nearestFood) {
-                            // SEEK food
-                            targetDirection.subVectors(nearestFood.position, this.position);
-                        } else {
-                            // Wander randomly
-                            targetDirection.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5);
-                        }
-                    } else if (this.type === 'carnivore') {
-                        if (isHungry && nearestPrey) {
-                            // HUNT prey
-                            targetDirection.subVectors(nearestPrey.position, this.position);
-                        } else {
-                            // Wander randomly
-                            targetDirection.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5);
-                        }
+                    // Project onto tangent plane to keep organism on sphere surface
+                    targetDirection.sub(normal.clone().multiplyScalar(targetDirection.dot(normal)));
+
+                    // If direction is too small, add tiny random movement to prevent getting stuck
+                    if (targetDirection.length() < 0.01) {
+                        targetDirection.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5);
+                        targetDirection.sub(normal.clone().multiplyScalar(targetDirection.dot(normal)));
                     }
 
-                    // Project onto tangent plane and move
-                    targetDirection.sub(normal.clone().multiplyScalar(targetDirection.dot(normal)));
                     targetDirection.normalize();
 
-                    this.velocity.copy(targetDirection.multiplyScalar(Math.abs(output) * this.speed));
+                    // Movement magnitude is based on NN output strength
+                    const movementStrength = Math.sqrt(outputs[0]**2 + outputs[1]**2 + outputs[2]**2);
+                    this.velocity.copy(targetDirection.multiplyScalar(movementStrength * this.speed));
                 }
 
                 update(delta, spatialGrid) {
@@ -3262,22 +3273,25 @@ class ParticleEffect {
                         1 - Math.min(nearestPreyDist / 40, 1)
                     ];
 
-                    // Neural network output
+                    // Neural network outputs: [moveX, moveY, moveZ]
                     nnOutput = selected.brain.think(nnInputs);
 
-                    // Describe current behavior
-                    const isHungry = selected.energy < 70;
-                    const inDanger = nearestPredatorDist < 15;
+                    // Describe what the brain is deciding
+                    const movementStrength = Math.sqrt(nnOutput[0]**2 + nnOutput[1]**2 + nnOutput[2]**2);
 
-                    if (inDanger && nearestPredatorDist !== Infinity) {
-                        behaviorDescription = `🏃 FLEEING from predator (${Math.floor(nearestPredatorDist)} units away)`;
-                    } else if (isHungry && nearestFoodDist !== Infinity) {
-                        behaviorDescription = `🍽️ SEEKING food (${Math.floor(nearestFoodDist)} units away)`;
-                    } else if (isHungry && nearestPreyDist !== Infinity) {
-                        behaviorDescription = `🎯 HUNTING prey (${Math.floor(nearestPreyDist)} units away)`;
+                    // Analyze dominant movement direction
+                    let dominantDir = '';
+                    const absOutputs = nnOutput.map(Math.abs);
+                    const maxIdx = absOutputs.indexOf(Math.max(...absOutputs));
+
+                    if (movementStrength > 0.3) {
+                        const dirs = ['lateral', 'vertical', 'forward/backward'];
+                        dominantDir = `Moving ${dirs[maxIdx]} at ${(movementStrength * 100).toFixed(0)}% power`;
                     } else {
-                        behaviorDescription = `🚶 WANDERING (controlled by neural network)`;
+                        dominantDir = `Nearly stationary (${(movementStrength * 100).toFixed(0)}% power)`;
                     }
+
+                    behaviorDescription = `🧠 BRAIN DECISION: ${dominantDir}`;
                 }
 
                 document.getElementById('creature-info').innerHTML = `
@@ -3341,14 +3355,26 @@ class ParticleEffect {
                                 </div>
                             </div>
 
-                            <div style="font-size: 0.75rem; color: var(--text-dim); margin: 0.6rem 0 0.4rem;">OUTPUT (Movement decision):</div>
+                            <div style="font-size: 0.75rem; color: var(--text-dim); margin: 0.6rem 0 0.4rem;">OUTPUTS (Brain's 3D movement decision):</div>
                             <div style="font-size: 0.8rem;">
                                 <div style="display: flex; justify-content: space-between; margin: 0.2rem 0;">
-                                    <span style="color: var(--text-dim);">Movement Speed:</span>
-                                    <span style="color: var(--text-normal);">${(Math.abs(nnOutput) * 100).toFixed(1)}%</span>
+                                    <span style="color: var(--text-dim);">Move X (lateral):</span>
+                                    <span style="color: ${nnOutput[0] > 0 ? '#0f0' : '#f88'};">${nnOutput[0] > 0 ? '+' : ''}${(nnOutput[0] * 100).toFixed(1)}%</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin: 0.2rem 0;">
+                                    <span style="color: var(--text-dim);">Move Y (vertical):</span>
+                                    <span style="color: ${nnOutput[1] > 0 ? '#0f0' : '#f88'};">${nnOutput[1] > 0 ? '+' : ''}${(nnOutput[1] * 100).toFixed(1)}%</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin: 0.2rem 0;">
+                                    <span style="color: var(--text-dim);">Move Z (forward/back):</span>
+                                    <span style="color: ${nnOutput[2] > 0 ? '#0f0' : '#f88'};">${nnOutput[2] > 0 ? '+' : ''}${(nnOutput[2] * 100).toFixed(1)}%</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin: 0.4rem 0 0 0; padding-top: 0.4rem; border-top: 1px solid rgba(255,255,255,0.1);">
+                                    <span style="color: var(--text-dim);">Total Movement Power:</span>
+                                    <span style="color: var(--text-bright); font-weight: 600;">${(Math.sqrt(nnOutput[0]**2 + nnOutput[1]**2 + nnOutput[2]**2) * 100).toFixed(1)}%</span>
                                 </div>
                                 <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 0.4rem; font-style: italic;">
-                                    The brain processes these 5 inputs through ${selected.brain.weights.length} connections to decide how fast to move.
+                                    The brain processes 5 inputs through ${selected.brain.getTotalWeights()} connections to output 3D movement vectors.
                                 </div>
                             </div>
                         </div>
@@ -3357,7 +3383,7 @@ class ParticleEffect {
                     ${selected.brain ? `
                     <div class="stat-row">
                         <span class="stat-label">Neural Network</span>
-                        <span class="stat-value">${selected.brain.weights.length} weights</span>
+                        <span class="stat-value">${selected.brain.getTotalWeights()} weights</span>
                     </div>` : ''}
                 `;
             }
