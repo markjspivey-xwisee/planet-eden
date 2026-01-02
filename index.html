@@ -1936,6 +1936,128 @@ class ParticleEffect {
             setTimeout(() => n.remove(), 3000);
         }
 
+        function showNeuralNetworkExplanation() {
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.85);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 10000;
+                padding: 20px;
+                animation: fadeIn 0.3s ease-out;
+            `;
+
+            modal.innerHTML = `
+                <div style="
+                    background: linear-gradient(135deg, rgba(10, 17, 40, 0.95), rgba(20, 10, 40, 0.95));
+                    border: 2px solid var(--border-bright);
+                    border-radius: 12px;
+                    max-width: 700px;
+                    max-height: 90vh;
+                    overflow-y: auto;
+                    padding: 2rem;
+                    box-shadow: 0 20px 60px rgba(0, 200, 255, 0.3);
+                ">
+                    <h2 style="color: var(--text-bright); margin: 0 0 1rem 0; font-size: 1.8rem;">🧠 How Neural Networks Control Organisms</h2>
+
+                    <div style="margin-bottom: 1.5rem;">
+                        <h3 style="color: var(--text-bright); font-size: 1.2rem; margin-bottom: 0.5rem;">🤖 What is a Neural Network?</h3>
+                        <p style="color: var(--text-normal); line-height: 1.6;">
+                            Each creature has a <strong>brain</strong> - a simple artificial intelligence inspired by biological neurons.
+                            The brain takes in information from the creature's surroundings and decides how to react.
+                        </p>
+                    </div>
+
+                    <div style="margin-bottom: 1.5rem; background: rgba(0, 100, 200, 0.15); padding: 1rem; border-radius: 8px; border-left: 3px solid var(--border-bright);">
+                        <h3 style="color: var(--text-bright); font-size: 1.2rem; margin-bottom: 0.5rem;">👁️ INPUTS: What the Brain Sees (5 values)</h3>
+                        <ul style="color: var(--text-normal); line-height: 1.8; padding-left: 1.5rem;">
+                            <li><strong>Energy:</strong> How hungry am I? (0-100%)</li>
+                            <li><strong>Health:</strong> How injured am I? (0-100%)</li>
+                            <li><strong>Food Nearby:</strong> Is there food close? (0-100%)</li>
+                            <li><strong>Predator Nearby:</strong> Am I in danger? (0-100%)</li>
+                            <li><strong>Prey Nearby:</strong> Can I hunt? (0-100%)</li>
+                        </ul>
+                    </div>
+
+                    <div style="margin-bottom: 1.5rem; background: rgba(100, 0, 200, 0.15); padding: 1rem; border-radius: 8px; border-left: 3px solid #a000ff;">
+                        <h3 style="color: var(--text-bright); font-size: 1.2rem; margin-bottom: 0.5rem;">🔗 PROCESSING: The "Think" Process</h3>
+                        <p style="color: var(--text-normal); line-height: 1.6;">
+                            The brain has <strong>20-40 "connections"</strong> (called weights) that process the inputs.
+                            Each connection multiplies an input by a number, and all these results are combined together.
+                            This is similar to how your brain cells connect and communicate!
+                        </p>
+                        <p style="color: var(--text-dim); font-size: 0.9rem; margin-top: 0.5rem; font-style: italic;">
+                            Example: If energy is low (10%) and food is nearby (80%), the weights multiply these values
+                            and combine them to decide "I should move fast toward food!"
+                        </p>
+                    </div>
+
+                    <div style="margin-bottom: 1.5rem; background: rgba(0, 200, 100, 0.15); padding: 1rem; border-radius: 8px; border-left: 3px solid #00ff88;">
+                        <h3 style="color: var(--text-bright); font-size: 1.2rem; margin-bottom: 0.5rem;">🏃 OUTPUT: Movement Decision</h3>
+                        <p style="color: var(--text-normal); line-height: 1.6;">
+                            After processing, the brain outputs a <strong>movement speed</strong> (0-100%).
+                            Combined with hard-coded survival rules (seek food when hungry, flee from predators),
+                            this creates complex, life-like behavior!
+                        </p>
+                    </div>
+
+                    <div style="margin-bottom: 1.5rem; background: rgba(255, 100, 0, 0.15); padding: 1rem; border-radius: 8px; border-left: 3px solid #ff6600;">
+                        <h3 style="color: var(--text-bright); font-size: 1.2rem; margin-bottom: 0.5rem;">🧬 EVOLUTION: Learning Through Generations</h3>
+                        <p style="color: var(--text-normal); line-height: 1.6;">
+                            When creatures reproduce, their brain is <strong>cloned and mutated</strong> (slightly changed).
+                            Over many generations, creatures with better brains (that help them survive longer) have more babies.
+                            This is <strong>natural selection</strong> in action - the simulation naturally evolves smarter creatures!
+                        </p>
+                    </div>
+
+                    <div style="margin-bottom: 1.5rem;">
+                        <h3 style="color: var(--text-bright); font-size: 1.2rem; margin-bottom: 0.5rem;">🎯 How to Watch It Work:</h3>
+                        <ol style="color: var(--text-normal); line-height: 1.8; padding-left: 1.5rem;">
+                            <li><strong>Click on any creature</strong> to select it</li>
+                            <li>Watch the <strong>"Neural Network Live State"</strong> panel</li>
+                            <li>See how inputs change as it moves around</li>
+                            <li>Notice how behavior changes based on what it perceives</li>
+                            <li>Compare brains of different generations - later ones are usually better!</li>
+                        </ol>
+                    </div>
+
+                    <div style="background: rgba(255, 255, 0, 0.1); padding: 1rem; border-radius: 8px; border: 1px solid rgba(255, 255, 0, 0.3); margin-bottom: 1.5rem;">
+                        <strong style="color: #ffdd00;">💡 Pro Tip:</strong>
+                        <p style="color: var(--text-normal); margin: 0.5rem 0 0 0; line-height: 1.6;">
+                            Use the <strong>"Evolve"</strong> god power on a creature to rapidly mutate its brain 5 generations forward!
+                            This creates more interesting behaviors faster.
+                        </p>
+                    </div>
+
+                    <button onclick="this.parentElement.parentElement.remove()" style="
+                        width: 100%;
+                        padding: 0.8rem;
+                        background: linear-gradient(135deg, var(--border-bright), #0088cc);
+                        border: none;
+                        border-radius: 6px;
+                        color: white;
+                        font-weight: 600;
+                        font-size: 1rem;
+                        cursor: pointer;
+                        transition: transform 0.2s;
+                    " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                        Got it! Let me watch the brains work 🧠
+                    </button>
+                </div>
+            `;
+
+            document.body.appendChild(modal);
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) modal.remove();
+            });
+        }
+
         (function() {
             const libs = {
                 three: {
@@ -3105,6 +3227,59 @@ class ParticleEffect {
 
                 document.getElementById('creature-detail').classList.add('show');
                 const icons = { plant: '🌳', herbivore: '🦌', carnivore: '🦁', humanoid: '👤' };
+
+                // Get current neural network state if organism has a brain
+                let nnInputs = null;
+                let nnOutput = null;
+                let behaviorDescription = '';
+
+                if (selected.brain && selected.type !== 'plant') {
+                    // Calculate what the organism is currently perceiving
+                    let nearestFoodDist = Infinity;
+                    let nearestPredatorDist = Infinity;
+                    let nearestPreyDist = Infinity;
+
+                    const nearby = spatialGrid.getNearby(selected.position);
+                    for (const o of nearby) {
+                        if (o === selected || o.dead) continue;
+                        const dist = selected.position.distanceTo(o.position);
+
+                        if (selected.type === 'herbivore' || selected.type === 'humanoid') {
+                            if (o.type === 'plant' && dist < nearestFoodDist) nearestFoodDist = dist;
+                            if (o.type === 'carnivore' && dist < nearestPredatorDist) nearestPredatorDist = dist;
+                        }
+                        if (selected.type === 'carnivore') {
+                            if ((o.type === 'herbivore' || o.type === 'humanoid') && dist < nearestPreyDist) nearestPreyDist = dist;
+                        }
+                    }
+
+                    // Neural network inputs
+                    nnInputs = [
+                        selected.energy / 100,
+                        selected.health / 100,
+                        1 - Math.min(nearestFoodDist / 40, 1),
+                        1 - Math.min(nearestPredatorDist / 40, 1),
+                        1 - Math.min(nearestPreyDist / 40, 1)
+                    ];
+
+                    // Neural network output
+                    nnOutput = selected.brain.think(nnInputs);
+
+                    // Describe current behavior
+                    const isHungry = selected.energy < 70;
+                    const inDanger = nearestPredatorDist < 15;
+
+                    if (inDanger && nearestPredatorDist !== Infinity) {
+                        behaviorDescription = `🏃 FLEEING from predator (${Math.floor(nearestPredatorDist)} units away)`;
+                    } else if (isHungry && nearestFoodDist !== Infinity) {
+                        behaviorDescription = `🍽️ SEEKING food (${Math.floor(nearestFoodDist)} units away)`;
+                    } else if (isHungry && nearestPreyDist !== Infinity) {
+                        behaviorDescription = `🎯 HUNTING prey (${Math.floor(nearestPreyDist)} units away)`;
+                    } else {
+                        behaviorDescription = `🚶 WANDERING (controlled by neural network)`;
+                    }
+                }
+
                 document.getElementById('creature-info').innerHTML = `
                     <div style="margin-bottom: 0.8rem; font-size: 1.2rem; color: var(--text-bright);">
                         ${icons[selected.type]} ${selected.type.toUpperCase()} #${selected.id}
@@ -3127,6 +3302,58 @@ class ParticleEffect {
                             <div class="progress-fill energy" style="width: ${selected.energy}%"></div>
                         </div>
                     </div>
+
+                    ${behaviorDescription ? `
+                        <div style="background: rgba(0, 100, 255, 0.15); border: 1px solid rgba(0, 200, 255, 0.3); border-radius: 6px; padding: 0.6rem; margin: 0.8rem 0; font-size: 0.85rem;">
+                            <div style="color: var(--text-bright); font-weight: 600; margin-bottom: 0.3rem;">🧠 Current Behavior:</div>
+                            <div style="color: var(--text-normal);">${behaviorDescription}</div>
+                        </div>
+                    ` : ''}
+
+                    ${selected.brain && nnInputs ? `
+                        <div style="background: rgba(50, 0, 100, 0.2); border: 1px solid rgba(150, 0, 255, 0.3); border-radius: 6px; padding: 0.8rem; margin: 0.8rem 0;">
+                            <div style="color: var(--text-bright); font-weight: 600; margin-bottom: 0.6rem; display: flex; justify-content: space-between; align-items: center;">
+                                <span>🧠 Neural Network Live State</span>
+                                <button onclick="showNeuralNetworkExplanation()" style="background: rgba(0, 200, 255, 0.2); border: 1px solid rgba(0, 200, 255, 0.5); color: var(--text-bright); border-radius: 4px; padding: 0.2rem 0.5rem; cursor: pointer; font-size: 0.75rem;">ℹ️ What's this?</button>
+                            </div>
+
+                            <div style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0.4rem;">INPUTS (What it sees):</div>
+                            <div style="font-size: 0.8rem; margin-bottom: 0.6rem;">
+                                <div style="display: flex; justify-content: space-between; margin: 0.2rem 0;">
+                                    <span style="color: var(--text-dim);">Energy Level:</span>
+                                    <span style="color: ${nnInputs[0] > 0.7 ? '#0f0' : nnInputs[0] > 0.3 ? '#ff0' : '#f00'};">${(nnInputs[0] * 100).toFixed(0)}%</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin: 0.2rem 0;">
+                                    <span style="color: var(--text-dim);">Health Level:</span>
+                                    <span style="color: ${nnInputs[1] > 0.7 ? '#0f0' : nnInputs[1] > 0.3 ? '#ff0' : '#f00'};">${(nnInputs[1] * 100).toFixed(0)}%</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin: 0.2rem 0;">
+                                    <span style="color: var(--text-dim);">Food Nearby:</span>
+                                    <span style="color: ${nnInputs[2] > 0.5 ? '#0f0' : nnInputs[2] > 0.2 ? '#ff0' : '#f00'};">${(nnInputs[2] * 100).toFixed(0)}%</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin: 0.2rem 0;">
+                                    <span style="color: var(--text-dim);">Predator Nearby:</span>
+                                    <span style="color: ${nnInputs[3] > 0.5 ? '#f00' : nnInputs[3] > 0.2 ? '#ff0' : '#0f0'};">${(nnInputs[3] * 100).toFixed(0)}%</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin: 0.2rem 0;">
+                                    <span style="color: var(--text-dim);">Prey Nearby:</span>
+                                    <span style="color: ${nnInputs[4] > 0.5 ? '#0f0' : '#888'};">${(nnInputs[4] * 100).toFixed(0)}%</span>
+                                </div>
+                            </div>
+
+                            <div style="font-size: 0.75rem; color: var(--text-dim); margin: 0.6rem 0 0.4rem;">OUTPUT (Movement decision):</div>
+                            <div style="font-size: 0.8rem;">
+                                <div style="display: flex; justify-content: space-between; margin: 0.2rem 0;">
+                                    <span style="color: var(--text-dim);">Movement Speed:</span>
+                                    <span style="color: var(--text-normal);">${(Math.abs(nnOutput) * 100).toFixed(1)}%</span>
+                                </div>
+                                <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 0.4rem; font-style: italic;">
+                                    The brain processes these 5 inputs through ${selected.brain.weights.length} connections to decide how fast to move.
+                                </div>
+                            </div>
+                        </div>
+                    ` : ''}
+
                     ${selected.brain ? `
                     <div class="stat-row">
                         <span class="stat-label">Neural Network</span>
