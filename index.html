@@ -2484,28 +2484,35 @@ class ParticleEffect {
             // ========== ORGANISMS ==========
             class Brain {
                 constructor(complexity = 1) {
-                    // Create weights for 8 outputs (FULL AUTONOMOUS CONTROL)
+                    // Create weights for 14 outputs (TRIBAL CIVILIZATION CONTROL)
+                    // OUTPUTS (14 total):
                     // 0-2: moveX, moveY, moveZ (movement direction)
                     // 3: speedModifier (how fast to move)
                     // 4: shouldEat (whether to eat available food)
                     // 5: shouldAttack (whether to attack nearby prey)
                     // 6: shouldReproduce (whether to attempt reproduction)
                     // 7: socialAttraction (seek vs avoid same-type organisms)
+                    // 8: shouldBuild (whether to build structures)
+                    // 9: buildingTypePriority (0-4 maps to hut/farm/tower/temple/wall)
+                    // 10: resourcePriority (which resource to gather)
+                    // 11: shouldGather (whether to gather resources)
+                    // 12: groupFormation (pack tactics)
+                    // 13: territorialDefense (defend territory)
                     this.weights = [];
-                    const weightsPerOutput = 8; // 8 inputs per output
-                    for (let output = 0; output < 8; output++) {
+                    const weightsPerOutput = 12; // 12 inputs per output
+                    for (let output = 0; output < 14; output++) {
                         this.weights[output] = Array(weightsPerOutput * complexity).fill(0).map(() => Math.random() * 2 - 1);
                     }
                 }
 
                 think(inputs) {
-                    // Return 8 outputs for FULL AUTONOMOUS CONTROL
+                    // Return 14 outputs for TRIBAL CIVILIZATION CONTROL
                     const outputs = [];
-                    for (let i = 0; i < 8; i++) {
+                    for (let i = 0; i < 14; i++) {
                         const sum = inputs.reduce((s, input, j) => s + input * this.weights[i][j % this.weights[i].length], 0);
                         outputs.push(Math.tanh(sum));
                     }
-                    return outputs; // [moveX, moveY, moveZ, speed, eat, attack, reproduce, social]
+                    return outputs; // [moveX, moveY, moveZ, speed, eat, attack, reproduce, social, build, buildType, resPriority, gather, group, defend]
                 }
 
                 clone() {
@@ -2516,7 +2523,7 @@ class ParticleEffect {
 
                 mutate() {
                     // Mutate a random weight in a random output
-                    const outputIdx = Math.floor(Math.random() * 8);
+                    const outputIdx = Math.floor(Math.random() * 14);
                     const weightIdx = Math.floor(Math.random() * this.weights[outputIdx].length);
                     this.weights[outputIdx][weightIdx] += (Math.random() - 0.5) * 0.4;
                 }
@@ -2524,6 +2531,121 @@ class ParticleEffect {
                 getTotalWeights() {
                     return this.weights.reduce((sum, w) => sum + w.length, 0);
                 }
+            }
+
+            // Tribe class for managing tribal societies
+            class Tribe {
+                constructor(founderId, founderType, foundationPosition) {
+                    this.id = tribeId++;
+                    this.name = this.generateTribeName();
+                    this.founderId = founderId;
+                    this.foundationTime = state.time;
+                    this.foundationPosition = foundationPosition.clone();
+                    this.type = founderType; // Type of organisms in this tribe
+
+                    // Membership
+                    this.members = new Set([founderId]);
+                    this.totalBornCount = 1;
+                    this.extinct = false;
+
+                    // Territory and resources
+                    this.territoryCenter = foundationPosition.clone();
+                    this.territoryRadius = 5;
+                    this.resources = { food: 100, wood: 50, stone: 50 };
+
+                    // Cultural traits (0-1 scale)
+                    this.traits = {
+                        aggression: 0.5,
+                        cooperation: 0.5,
+                        building: 0.5,
+                        reproduction: 0.5
+                    };
+
+                    // Social relationships
+                    this.allies = new Set();
+                    this.enemies = new Set();
+
+                    // Buildings owned by tribe
+                    this.buildings = [];
+
+                    // Lineage tracking
+                    this.familyTree = {
+                        parentMap: new Map(),    // childId -> parentId
+                        childrenMap: new Map()   // parentId -> Set of childIds
+                    };
+
+                    // Visual color for tribe
+                    this.color = new THREE.Color().setHSL(Math.random(), 0.7, 0.6);
+                }
+
+                generateTribeName() {
+                    const prefixes = ['Red', 'Blue', 'Green', 'Mountain', 'River', 'Forest', 'Sky', 'Stone', 'Fire', 'Ice'];
+                    const suffixes = ['Clan', 'Tribe', 'People', 'Folk', 'Kin', 'Band', 'Pack', 'Family'];
+                    return prefixes[Math.floor(Math.random() * prefixes.length)] + ' ' +
+                           suffixes[Math.floor(Math.random() * suffixes.length)];
+                }
+
+                addMember(organismId) {
+                    this.members.add(organismId);
+                    this.totalBornCount++;
+                }
+
+                removeMember(organismId) {
+                    this.members.delete(organismId);
+                    if (this.members.size === 0) {
+                        this.extinct = true;
+                    }
+                }
+
+                getNearbyMembers(position, radius) {
+                    const nearby = [];
+                    for (const memberId of this.members) {
+                        const organism = organisms.find(o => o.id === memberId);
+                        if (organism && !organism.dead && organism.position.distanceTo(position) < radius) {
+                            nearby.push(organism);
+                        }
+                    }
+                    return nearby;
+                }
+
+                updateTerritoryCenter() {
+                    // Recalculate territory center based on member positions
+                    if (this.members.size === 0) return;
+
+                    const center = new THREE.Vector3();
+                    let count = 0;
+                    for (const memberId of this.members) {
+                        const organism = organisms.find(o => o.id === memberId);
+                        if (organism && !organism.dead) {
+                            center.add(organism.position);
+                            count++;
+                        }
+                    }
+                    if (count > 0) {
+                        center.divideScalar(count);
+                        this.territoryCenter = center;
+                    }
+                }
+
+                modifyRelation(otherTribe, amount) {
+                    // Positive amount = more friendly, negative = more hostile
+                    if (amount < -3) {
+                        this.enemies.add(otherTribe.id);
+                        this.allies.delete(otherTribe.id);
+                    } else if (amount > 3) {
+                        this.allies.add(otherTribe.id);
+                        this.enemies.delete(otherTribe.id);
+                    }
+                }
+            }
+
+            // Global tribe management
+            let tribeId = 0;
+            const tribes = new Map(); // tribeId -> Tribe instance
+
+            // Helper function to get tribe by ID
+            function getTribeById(id) {
+                return tribes.get(id);
             }
 
             let orgId = 0;
@@ -2553,7 +2675,27 @@ class ParticleEffect {
                         shouldEat: 0.5,
                         shouldAttack: 0.5,
                         shouldReproduce: 0.5,
-                        socialAttraction: 0
+                        socialAttraction: 0,
+                        shouldBuild: 0,
+                        buildingTypePriority: 0,
+                        resourcePriority: 0,
+                        shouldGather: 0,
+                        groupFormation: 0,
+                        territorialDefense: 0
+                    };
+
+                    // Tribal membership fields
+                    this.tribeId = null;           // Which tribe this organism belongs to
+                    this.parentId = null;          // Parent organism ID (for family tree)
+                    this.lineage = [];             // Array of ancestor IDs [parent, grandparent, ...]
+                    this.children = new Set();     // IDs of direct offspring
+
+                    // Tribal awareness (computed during think())
+                    this.tribalContext = {
+                        nearbyTribeMates: 0,
+                        nearbyEnemies: 0,
+                        tribeStrength: 0,
+                        isTribalTerritory: false
                     };
 
                     const sizes = { plant: 2.5, herbivore: 2, carnivore: 2.5, humanoid: 3 };
@@ -2734,7 +2876,46 @@ class ParticleEffect {
                         }
                     });
 
-                    // 8 INPUTS for full environmental awareness
+                    // Compute tribal awareness
+                    let nearbyTribeMates = 0;
+                    let nearbyEnemies = 0;
+                    let tribeStrength = 0;
+
+                    if (this.tribeId) {
+                        const tribe = getTribeById(this.tribeId);
+                        if (tribe) {
+                            // Count nearby tribe members
+                            nearby.forEach(o => {
+                                if (o.tribeId === this.tribeId && !o.dead) {
+                                    nearbyTribeMates++;
+                                } else if (o.tribeId && o.tribeId !== this.tribeId && !o.dead) {
+                                    nearbyEnemies++;
+                                }
+                            });
+
+                            // Calculate tribe strength (average energy * member count)
+                            let totalEnergy = 0;
+                            let count = 0;
+                            for (const memberId of tribe.members) {
+                                const member = organisms.find(m => m.id === memberId);
+                                if (member && !member.dead) {
+                                    totalEnergy += member.energy;
+                                    count++;
+                                }
+                            }
+                            tribeStrength = count > 0 ? (totalEnergy / count) * count / 100 : 0;
+                        }
+                    }
+
+                    // Update tribal context
+                    this.tribalContext = {
+                        nearbyTribeMates,
+                        nearbyEnemies,
+                        tribeStrength,
+                        isTribalTerritory: false // Will be computed by territory system later
+                    };
+
+                    // 12 INPUTS for full environmental and tribal awareness
                     const inputs = [
                         this.energy / 100,                           // 0: Energy level
                         this.health / 100,                           // 1: Health level
@@ -2743,10 +2924,14 @@ class ParticleEffect {
                         1 - Math.min(nearestPreyDist / 40, 1),      // 4: Prey proximity
                         Math.min(this.age / 200, 1),                // 5: Age (normalized)
                         Math.min(nearbySameType / 10, 1),           // 6: Social density
-                        Math.min(this.generation / 20, 1)           // 7: Generation (evolutionary progress)
+                        Math.min(this.generation / 20, 1),          // 7: Generation (evolutionary progress)
+                        Math.min(nearbyTribeMates / 10, 1),         // 8: Tribe size (nearby members)
+                        Math.min(tribeStrength / 100, 1),           // 9: Tribe strength
+                        Math.min(nearbyEnemies / 10, 1),            // 10: Enemy proximity
+                        0                                            // 11: Ally proximity (reserved for future)
                     ];
 
-                    // Get neural network outputs: [moveX, moveY, moveZ, speed, eat, attack, reproduce, social]
+                    // Get neural network outputs: [moveX, moveY, moveZ, speed, eat, attack, reproduce, social, build, buildType, resPriority, gather, group, defend]
                     const outputs = this.brain.think(inputs);
 
                     // Store decisions for behavior control
@@ -2758,7 +2943,13 @@ class ParticleEffect {
                         shouldEat: outputs[4],
                         shouldAttack: outputs[5],
                         shouldReproduce: outputs[6],
-                        socialAttraction: outputs[7]
+                        socialAttraction: outputs[7],
+                        shouldBuild: outputs[8],
+                        buildingTypePriority: outputs[9],
+                        resourcePriority: outputs[10],
+                        shouldGather: outputs[11],
+                        groupFormation: outputs[12],
+                        territorialDefense: outputs[13]
                     };
 
                     // FULL NEURAL NETWORK CONTROL - brain decides EVERYTHING!
@@ -2872,6 +3063,15 @@ class ParticleEffect {
                 die() {
                     this.dead = true;
                     this.deathTime = 0; // Start decay timer
+
+                    // Remove from tribe
+                    if (this.tribeId) {
+                        const tribe = getTribeById(this.tribeId);
+                        if (tribe) {
+                            tribe.removeMember(this.id);
+                        }
+                    }
+
                     if (this.mesh) {
                         this.mesh.traverse(child => {
                             if (child.material) {
@@ -2923,6 +3123,32 @@ class ParticleEffect {
                     const child = new Organism(this.type, this.position.clone().add(offset));
                     child.generation = this.generation + 1;
                     child.brain = childBrain;
+
+                    // NEW: Tribal inheritance and parent tracking
+                    child.parentId = this.id;
+                    child.lineage = [this.id, ...this.lineage];
+                    child.tribeId = this.tribeId;
+
+                    // Update parent's children set
+                    this.children.add(child.id);
+
+                    // Add to tribe if parent has one
+                    const tribe = getTribeById(this.tribeId);
+                    if (tribe) {
+                        tribe.addMember(child.id);
+                        tribe.familyTree.parentMap.set(child.id, this.id);
+                        if (!tribe.familyTree.childrenMap.has(this.id)) {
+                            tribe.familyTree.childrenMap.set(this.id, new Set());
+                        }
+                        tribe.familyTree.childrenMap.get(this.id).add(child.id);
+                    } else if (this.type === 'humanoid' && !this.tribeId) {
+                        // Create a new tribe if this is a humanoid without a tribe
+                        const newTribe = new Tribe(this.id, this.type, this.position);
+                        tribes.set(newTribe.id, newTribe);
+                        this.tribeId = newTribe.id;
+                        child.tribeId = newTribe.id;
+                        newTribe.addMember(child.id);
+                    }
 
                     return child;
                 }
