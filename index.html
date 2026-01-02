@@ -3023,6 +3023,80 @@ class ParticleEffect {
             let resourceNodeId = 0;
             const resourceNodes = [];
 
+            // Territory control system
+            class TerritoryGrid {
+                constructor(cellSize) {
+                    this.cellSize = cellSize;
+                    this.cells = new Map(); // key -> {tribe, strength}
+                }
+
+                getCellKey(position) {
+                    const x = Math.floor(position.x / this.cellSize);
+                    const y = Math.floor(position.y / this.cellSize);
+                    const z = Math.floor(position.z / this.cellSize);
+                    return `${x},${y},${z}`;
+                }
+
+                update() {
+                    this.cells.clear();
+
+                    // Buildings claim territory with strong influence
+                    for (const building of buildings) {
+                        if (!building.isConstructed) continue;
+                        const influence = building.type === 'tower' ? 3 : 1;
+                        const range = building.type === 'tower' ? 25 : 15;
+                        this.claimArea(building.position, range / this.cellSize, building.tribe, influence * 10);
+                    }
+
+                    // Tribe members provide minor territorial control
+                    for (const tribe of tribes.values()) {
+                        for (const memberId of tribe.members) {
+                            const member = organisms.find(o => o.id === memberId);
+                            if (member && !member.dead) {
+                                this.claimArea(member.position, 1, tribe, 1);
+                            }
+                        }
+                    }
+                }
+
+                claimArea(position, radius, tribe, strength) {
+                    const radiusCells = Math.ceil(radius);
+                    const centerKey = this.getCellKey(position);
+                    const [cx, cy, cz] = centerKey.split(',').map(Number);
+
+                    for (let dx = -radiusCells; dx <= radiusCells; dx++) {
+                        for (let dy = -radiusCells; dy <= radiusCells; dy++) {
+                            for (let dz = -radiusCells; dz <= radiusCells; dz++) {
+                                const key = `${cx + dx},${cy + dy},${cz + dz}`;
+                                const existing = this.cells.get(key);
+
+                                if (!existing || existing.strength < strength) {
+                                    this.cells.set(key, { tribe, strength });
+                                }
+                            }
+                        }
+                    }
+                }
+
+                getController(position) {
+                    const cellKey = this.getCellKey(position);
+                    const cell = this.cells.get(cellKey);
+                    return cell ? cell.tribe : null;
+                }
+
+                getControlledCells(tribe) {
+                    let count = 0;
+                    for (const cell of this.cells.values()) {
+                        if (cell.tribe === tribe) {
+                            count++;
+                        }
+                    }
+                    return count;
+                }
+            }
+
+            const territoryGrid = new TerritoryGrid(15); // 15-unit cells
+
             let orgId = 0;
             const organisms = [];
             let selected = null;
@@ -3597,6 +3671,112 @@ class ParticleEffect {
                     }
 
                     return null;
+                }
+
+                // Combat system with group bonuses and tribal warfare
+                attack(target) {
+                    if (this.dead || target.dead) return false;
+
+                    let baseDamage = 10;
+
+                    // Building bonuses (from towers in range)
+                    if (this.attackMultiplier) {
+                        baseDamage *= this.attackMultiplier;
+                        this.attackMultiplier = 1; // Reset for next frame
+                    }
+
+                    // Group bonus (nearby allies of same tribe)
+                    if (this.tribeId) {
+                        const tribe = getTribeById(this.tribeId);
+                        if (tribe) {
+                            const nearbyAllies = tribe.getNearbyMembers(this.position, 8);
+                            const groupBonus = Math.min(nearbyAllies.length * 0.1, 0.5); // Max 50% bonus
+                            baseDamage *= (1 + groupBonus);
+                        }
+                    }
+
+                    // Type-based damage modifiers
+                    const damageMultipliers = {
+                        carnivore: 1.5,
+                        humanoid: 1.2,
+                        herbivore: 0.8,
+                        plant: 0.3
+                    };
+                    baseDamage *= (damageMultipliers[this.type] || 1);
+
+                    // Apply defense reduction
+                    let defenseReduction = 1;
+                    if (target.defenseMultiplier) {
+                        defenseReduction = 1 / target.defenseMultiplier;
+                        target.defenseMultiplier = 1; // Reset for next frame
+                    }
+
+                    const finalDamage = baseDamage * defenseReduction;
+                    target.health -= finalDamage;
+
+                    // Death handling
+                    if (target.health <= 0) {
+                        target.die();
+
+                        // Tribal relations impact
+                        if (this.tribeId && target.tribeId && this.tribeId !== target.tribeId) {
+                            const myTribe = getTribeById(this.tribeId);
+                            const targetTribe = getTribeById(target.tribeId);
+                            if (myTribe && targetTribe) {
+                                myTribe.modifyRelation(targetTribe, -5); // Hostile action
+                                targetTribe.modifyRelation(myTribe, -5);
+                            }
+                        }
+
+                        return true; // Target killed
+                    }
+
+                    return false;
+                }
+
+                // Attack building (siege mechanics)
+                attackBuilding(building) {
+                    if (this.type !== 'humanoid' || this.dead) return false;
+                    if (!building || building.health <= 0) return false;
+
+                    // Check if from enemy tribe
+                    if (this.tribeId && building.tribe.id === this.tribeId) {
+                        return false; // Don't attack own buildings
+                    }
+
+                    let damage = 5; // Base building damage
+
+                    // Group bonus for siege
+                    if (this.tribeId) {
+                        const tribe = getTribeById(this.tribeId);
+                        if (tribe) {
+                            const nearbyAllies = tribe.getNearbyMembers(this.position, 8);
+                            damage += nearbyAllies.length * 2; // Siege is more effective with allies
+                        }
+                    }
+
+                    building.health -= damage;
+
+                    if (building.health <= 0) {
+                        // Building destroyed
+                        console.log(`${building.tribe.name}'s ${building.type} was destroyed!`);
+                        building.destroy();
+                        const index = buildings.indexOf(building);
+                        if (index > -1) buildings.splice(index, 1);
+
+                        // Tribal relations impact
+                        if (this.tribeId) {
+                            const myTribe = getTribeById(this.tribeId);
+                            if (myTribe) {
+                                myTribe.modifyRelation(building.tribe, -10); // Major hostile action
+                                building.tribe.modifyRelation(myTribe, -10);
+                            }
+                        }
+
+                        return true; // Building destroyed
+                    }
+
+                    return false;
                 }
             }
 
