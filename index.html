@@ -2562,7 +2562,7 @@ class ParticleEffect {
                     let targetDirection = new THREE.Vector3();
 
                     // Decide what to do based on situation
-                    const isHungry = this.energy < 50;
+                    const isHungry = this.energy < 70; // Seek food earlier to prevent starvation
                     const inDanger = nearestPredatorDist < 15;
 
                     if (this.type === 'herbivore' || this.type === 'humanoid') {
@@ -2681,13 +2681,23 @@ class ParticleEffect {
                 }
 
                 canReproduce() {
-                    // Reduced requirements for easier reproduction (was energy>80, health>60, timer>50)
-                    return !this.dead && this.energy > 70 && this.health > 50 && this.reproduceTimer > 40;
+                    // Different requirements for plants vs animals
+                    if (this.type === 'plant') {
+                        // Plants reproduce faster to sustain ecosystem
+                        return !this.dead && this.energy > 60 && this.reproduceTimer > 25;
+                    } else {
+                        // Animals need more energy to reproduce (was energy>80, health>60, timer>50)
+                        return !this.dead && this.energy > 70 && this.health > 50 && this.reproduceTimer > 40;
+                    }
                 }
 
                 reproduce() {
-                    // Reduced reproduction cost for better population growth (was 40, now 30)
-                    this.energy -= 30;
+                    // Different costs for plants vs animals
+                    if (this.type === 'plant') {
+                        this.energy -= 20; // Lower cost for plants
+                    } else {
+                        this.energy -= 30; // Higher cost for animals (was 40, now 30)
+                    }
                     this.reproduceTimer = 0;
 
                     const childBrain = this.brain ? this.brain.clone() : null;
@@ -2768,7 +2778,7 @@ class ParticleEffect {
                 }
             }
 
-            const spatialGrid = new SpatialGrid(10); // 10 unit cells
+            const spatialGrid = new SpatialGrid(20); // 20 unit cells for better food detection
 
             function updateEcosystem(delta) {
                 // Build spatial grid FIRST for both thinking and collision detection
@@ -4061,8 +4071,8 @@ class ParticleEffect {
             });
 
             // Initial spawn - Increased populations for better survival
-            spawnOrganism('plant', 50); // Was 35, now 50
-            spawnOrganism('herbivore', 15); // Was 10, now 15
+            spawnOrganism('plant', 100); // Increased for better sustainability
+            spawnOrganism('herbivore', 20); // Balanced with more plants
             spawnOrganism('carnivore', 5); // Was 3, now 5
             spawnOrganism('humanoid', 4); // Was 2, now 4
 
