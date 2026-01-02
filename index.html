@@ -4077,6 +4077,47 @@ class ParticleEffect {
                             }
                         }
                     }
+
+                    // Humanoid tribal behaviors
+                    if (o.type === 'humanoid' && o.tribeId) {
+                        // Resource gathering (brain decides when to gather)
+                        if (o.brainDecisions.shouldGather > 0.3) {
+                            // Find nearest resource node
+                            let nearestNode = null;
+                            let nearestDist = Infinity;
+                            for (const node of resourceNodes) {
+                                const dist = o.position.distanceTo(node.position);
+                                if (dist < nearestDist && node.amount > 0) {
+                                    nearestNode = node;
+                                    nearestDist = dist;
+                                }
+                            }
+
+                            // Gather if close enough
+                            if (nearestNode && nearestDist < 5) {
+                                o.gatherResource(nearestNode, delta);
+                            }
+
+                            // Deposit resources when carrying a lot or near tribe center
+                            const totalCarrying = o.carryingResources.food + o.carryingResources.wood + o.carryingResources.stone;
+                            if (totalCarrying > 20) {
+                                o.depositResources();
+                            }
+                        }
+
+                        // Building construction (brain decides when to build)
+                        if (o.brainDecisions.shouldBuild > 0.7 && o.tribeId) {
+                            const tribe = getTribeById(o.tribeId);
+                            if (tribe && tribe.buildings.length < 5) { // Max 5 buildings per tribe
+                                // Map building type priority to actual type
+                                const buildingTypes = ['hut', 'farm', 'tower', 'temple', 'wall'];
+                                const typeIndex = Math.floor((o.brainDecisions.buildingTypePriority + 1) * 2.5); // Maps [-1,1] to [0,5]
+                                const buildingType = buildingTypes[Math.min(typeIndex, 4)];
+
+                                o.attemptBuild(buildingType);
+                            }
+                        }
+                    }
                 }
 
                 // God mode effects on organisms
@@ -4128,6 +4169,21 @@ class ParticleEffect {
                     if (o.canReproduce()) {
                         organisms.push(o.reproduce());
                     }
+                }
+
+                // Update buildings
+                for (const building of buildings) {
+                    building.update(delta);
+                }
+
+                // Update resource nodes
+                for (const node of resourceNodes) {
+                    node.update(delta);
+                }
+
+                // Update territory grid every 5 time units
+                if (Math.floor(state.time) % 5 === 0) {
+                    territoryGrid.update();
                 }
 
                 // Cleanup fully decayed organisms
@@ -5503,6 +5559,41 @@ class ParticleEffect {
             spawnOrganism('herbivore', 20); // Balanced with more plants
             spawnOrganism('carnivore', 5); // Was 3, now 5
             spawnOrganism('humanoid', 4); // Was 2, now 4
+
+            // Spawn resource nodes for tribal gathering
+            function spawnResourceNodes() {
+                // Spawn 20 wood nodes (trees)
+                for (let i = 0; i < 20; i++) {
+                    const theta = Math.random() * Math.PI * 2;
+                    const phi = Math.acos(2 * Math.random() - 1);
+                    const pos = new THREE.Vector3(
+                        Math.sin(phi) * Math.cos(theta),
+                        Math.cos(phi),
+                        Math.sin(phi) * Math.sin(theta)
+                    ).multiplyScalar(PLANET_RADIUS);
+
+                    const node = new ResourceNode('wood', pos);
+                    resourceNodes.push(node);
+                    planetGroup.add(node.mesh);
+                }
+
+                // Spawn 20 stone nodes (rocks)
+                for (let i = 0; i < 20; i++) {
+                    const theta = Math.random() * Math.PI * 2;
+                    const phi = Math.acos(2 * Math.random() - 1);
+                    const pos = new THREE.Vector3(
+                        Math.sin(phi) * Math.cos(theta),
+                        Math.cos(phi),
+                        Math.sin(phi) * Math.sin(theta)
+                    ).multiplyScalar(PLANET_RADIUS);
+
+                    const node = new ResourceNode('stone', pos);
+                    resourceNodes.push(node);
+                    planetGroup.add(node.mesh);
+                }
+            }
+
+            spawnResourceNodes();
 
             // Initialize cached counts immediately so stats show correctly
             updateOrganismCounts();
