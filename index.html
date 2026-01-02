@@ -2648,6 +2648,381 @@ class ParticleEffect {
                 return tribes.get(id);
             }
 
+            // Building class for tribal structures
+            class Building {
+                constructor(type, position, tribe) {
+                    this.id = buildingId++;
+                    this.type = type; // 'hut', 'farm', 'tower', 'temple', 'wall'
+                    this.position = position.clone();
+                    this.tribe = tribe;
+                    this.level = 1;
+                    this.health = 100;
+                    this.constructionProgress = 0; // 0-100
+                    this.isConstructed = false;
+                    this.mesh = null;
+
+                    // Building stats by type
+                    this.stats = {
+                        hut: {
+                            housingCapacity: 5,
+                            energyRegenBonus: 0.1,
+                            range: 8,
+                            cost: { food: 20, wood: 30, stone: 10 }
+                        },
+                        farm: {
+                            foodProduction: 2,
+                            range: 12,
+                            cost: { food: 10, wood: 25, stone: 5 }
+                        },
+                        tower: {
+                            visionRange: 25,
+                            defenseBonus: 0.3,
+                            attackBonus: 0.2,
+                            range: 20,
+                            cost: { food: 15, wood: 20, stone: 40 }
+                        },
+                        temple: {
+                            reproductionBonus: 0.25,
+                            healingRate: 0.5,
+                            range: 15,
+                            cost: { food: 25, wood: 30, stone: 30 }
+                        },
+                        wall: {
+                            defenseBonus: 0.5,
+                            range: 3,
+                            cost: { food: 5, wood: 15, stone: 35 }
+                        }
+                    }[type];
+
+                    this.createMesh(); // Create 3D visual
+                }
+
+                createMesh() {
+                    const group = new THREE.Group();
+                    const baseColor = new THREE.Color(0x8B7355); // Brown/tan base
+
+                    if (this.type === 'hut') {
+                        // Cylinder base + cone roof
+                        const baseGeo = new THREE.CylinderGeometry(2, 2.5, 3, 8);
+                        const baseMat = new THREE.MeshStandardMaterial({
+                            color: 0x8B7355,
+                            roughness: 0.8
+                        });
+                        const base = new THREE.Mesh(baseGeo, baseMat);
+                        base.position.y = 1.5;
+                        group.add(base);
+
+                        const roofGeo = new THREE.ConeGeometry(3, 2.5, 8);
+                        const roofMat = new THREE.MeshStandardMaterial({
+                            color: 0x654321,
+                            roughness: 0.9
+                        });
+                        const roof = new THREE.Mesh(roofGeo, roofMat);
+                        roof.position.y = 4.25;
+                        group.add(roof);
+
+                    } else if (this.type === 'farm') {
+                        // Rectangular plots with crop markers
+                        const plotGeo = new THREE.BoxGeometry(6, 0.3, 4);
+                        const plotMat = new THREE.MeshStandardMaterial({
+                            color: 0x4a3520,
+                            roughness: 1
+                        });
+                        const plot = new THREE.Mesh(plotGeo, plotMat);
+                        plot.position.y = 0.15;
+                        group.add(plot);
+
+                        // Add crop markers
+                        for (let i = 0; i < 4; i++) {
+                            const cropGeo = new THREE.BoxGeometry(1, 0.8, 0.2);
+                            const cropMat = new THREE.MeshStandardMaterial({
+                                color: 0x228B22,
+                                emissive: 0x114511,
+                                emissiveIntensity: 0.3
+                            });
+                            const crop = new THREE.Mesh(cropGeo, cropMat);
+                            crop.position.set((i - 1.5) * 1.5, 0.7, 0);
+                            group.add(crop);
+                        }
+
+                    } else if (this.type === 'tower') {
+                        // Tall cylinder with battlements
+                        const towerGeo = new THREE.CylinderGeometry(1.5, 2, 7, 8);
+                        const towerMat = new THREE.MeshStandardMaterial({
+                            color: 0x696969,
+                            roughness: 0.9
+                        });
+                        const tower = new THREE.Mesh(towerGeo, towerMat);
+                        tower.position.y = 3.5;
+                        group.add(tower);
+
+                        // Battlements
+                        for (let i = 0; i < 8; i++) {
+                            const angle = (i / 8) * Math.PI * 2;
+                            const battGeo = new THREE.BoxGeometry(0.5, 0.8, 0.5);
+                            const batt = new THREE.Mesh(battGeo, towerMat);
+                            batt.position.set(
+                                Math.cos(angle) * 1.5,
+                                7.4,
+                                Math.sin(angle) * 1.5
+                            );
+                            group.add(batt);
+                        }
+
+                    } else if (this.type === 'temple') {
+                        // Pyramid with glowing orb
+                        const pyramidGeo = new THREE.ConeGeometry(3, 5, 4);
+                        const pyramidMat = new THREE.MeshStandardMaterial({
+                            color: 0xFFD700,
+                            emissive: 0x887700,
+                            emissiveIntensity: 0.4,
+                            roughness: 0.3
+                        });
+                        const pyramid = new THREE.Mesh(pyramidGeo, pyramidMat);
+                        pyramid.position.y = 2.5;
+                        pyramid.rotation.y = Math.PI / 4;
+                        group.add(pyramid);
+
+                        // Glowing orb on top
+                        const orbGeo = new THREE.SphereGeometry(0.5, 16, 16);
+                        const orbMat = new THREE.MeshStandardMaterial({
+                            color: 0xFFFFFF,
+                            emissive: 0xFFFF00,
+                            emissiveIntensity: 1
+                        });
+                        const orb = new THREE.Mesh(orbGeo, orbMat);
+                        orb.position.y = 5.5;
+                        group.add(orb);
+
+                    } else if (this.type === 'wall') {
+                        // Box with crenellations
+                        const wallGeo = new THREE.BoxGeometry(4, 2.5, 1);
+                        const wallMat = new THREE.MeshStandardMaterial({
+                            color: 0x808080,
+                            roughness: 1
+                        });
+                        const wall = new THREE.Mesh(wallGeo, wallMat);
+                        wall.position.y = 1.25;
+                        group.add(wall);
+
+                        // Crenellations
+                        for (let i = 0; i < 5; i++) {
+                            if (i % 2 === 0) {
+                                const crenGeo = new THREE.BoxGeometry(0.6, 0.5, 0.8);
+                                const cren = new THREE.Mesh(crenGeo, wallMat);
+                                cren.position.set((i - 2) * 0.9, 2.75, 0);
+                                group.add(cren);
+                            }
+                        }
+                    }
+
+                    // Construction overlay (semi-transparent during construction)
+                    if (!this.isConstructed) {
+                        group.traverse(child => {
+                            if (child.material) {
+                                child.material.transparent = true;
+                                child.material.opacity = 0.5;
+                            }
+                        });
+                    }
+
+                    this.mesh = group;
+                    this.mesh.userData.building = this;
+
+                    // Position the building on the planet surface
+                    this.updateMeshPosition();
+                }
+
+                updateMeshPosition() {
+                    if (!this.mesh) return;
+
+                    const normal = this.position.clone().normalize();
+                    this.mesh.position.copy(this.position);
+
+                    // Orient building to stand perpendicular to planet surface
+                    this.mesh.up.copy(normal);
+                    this.mesh.lookAt(this.position.clone().add(normal));
+                }
+
+                update(delta) {
+                    // Construction progress (requires nearby tribe members)
+                    if (!this.isConstructed) {
+                        const nearbyWorkers = this.tribe.getNearbyMembers(this.position, 5);
+                        this.constructionProgress += nearbyWorkers.length * 2 * delta;
+
+                        if (this.constructionProgress >= 100) {
+                            this.isConstructed = true;
+                            // Make building fully opaque when constructed
+                            this.mesh.traverse(child => {
+                                if (child.material) {
+                                    child.material.opacity = 1;
+                                }
+                            });
+                            console.log(`${this.tribe.name} completed ${this.type}!`);
+                        }
+                    }
+
+                    // Production (farms generate food)
+                    if (this.type === 'farm' && this.isConstructed) {
+                        this.tribe.resources.food += this.stats.foodProduction * delta;
+                    }
+
+                    // Apply bonuses to nearby members
+                    this.applyBonuses(delta);
+                }
+
+                applyBonuses(delta) {
+                    if (!this.isConstructed) return;
+
+                    const nearby = this.tribe.getNearbyMembers(this.position, this.stats.range);
+                    for (const member of nearby) {
+                        if (this.type === 'hut') {
+                            // Energy regeneration bonus
+                            member.energy += this.stats.energyRegenBonus * delta;
+                            member.energy = Math.min(100, member.energy);
+                        } else if (this.type === 'tower') {
+                            // Combat bonuses
+                            member.defenseMultiplier = (member.defenseMultiplier || 1) + this.stats.defenseBonus;
+                            member.attackMultiplier = (member.attackMultiplier || 1) + this.stats.attackBonus;
+                        } else if (this.type === 'temple') {
+                            // Healing
+                            member.health += this.stats.healingRate * delta;
+                            member.health = Math.min(100, member.health);
+                        }
+                    }
+                }
+
+                destroy() {
+                    if (this.mesh) {
+                        planetGroup.remove(this.mesh);
+                        this.mesh = null;
+                    }
+                }
+            }
+
+            // Global building management
+            let buildingId = 0;
+            const buildings = [];
+
+            // ResourceNode class for gathering
+            class ResourceNode {
+                constructor(type, position) {
+                    this.id = resourceNodeId++;
+                    this.type = type; // 'wood' or 'stone'
+                    this.position = position.clone();
+                    this.amount = 100;
+                    this.maxAmount = 100;
+                    this.regenerationRate = 0.5; // Amount per second
+                    this.mesh = null;
+                    this.createMesh();
+                }
+
+                createMesh() {
+                    const group = new THREE.Group();
+
+                    if (this.type === 'wood') {
+                        // Tree representation
+                        const trunkGeo = new THREE.CylinderGeometry(0.4, 0.5, 4, 8);
+                        const trunkMat = new THREE.MeshStandardMaterial({
+                            color: 0x4a3520,
+                            roughness: 0.9
+                        });
+                        const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+                        trunk.position.y = 2;
+                        group.add(trunk);
+
+                        const canopyGeo = new THREE.SphereGeometry(1.8, 8, 8);
+                        const canopyMat = new THREE.MeshStandardMaterial({
+                            color: 0x2d5016,
+                            emissive: 0x1a3010,
+                            emissiveIntensity: 0.2,
+                            roughness: 0.7
+                        });
+                        const canopy = new THREE.Mesh(canopyGeo, canopyMat);
+                        canopy.position.y = 4.5;
+                        group.add(canopy);
+
+                    } else if (this.type === 'stone') {
+                        // Rock representation
+                        const rockGeo = new THREE.DodecahedronGeometry(1.5, 0);
+                        const rockMat = new THREE.MeshStandardMaterial({
+                            color: 0x808080,
+                            roughness: 1,
+                            flatShading: true
+                        });
+                        const rock = new THREE.Mesh(rockGeo, rockMat);
+                        rock.position.y = 1.5;
+                        rock.rotation.set(
+                            Math.random() * Math.PI,
+                            Math.random() * Math.PI,
+                            Math.random() * Math.PI
+                        );
+                        group.add(rock);
+
+                        // Add smaller rocks around
+                        for (let i = 0; i < 3; i++) {
+                            const smallRockGeo = new THREE.DodecahedronGeometry(0.5, 0);
+                            const smallRock = new THREE.Mesh(smallRockGeo, rockMat);
+                            const angle = (i / 3) * Math.PI * 2;
+                            smallRock.position.set(
+                                Math.cos(angle) * 1.2,
+                                0.5,
+                                Math.sin(angle) * 1.2
+                            );
+                            smallRock.rotation.set(
+                                Math.random() * Math.PI,
+                                Math.random() * Math.PI,
+                                Math.random() * Math.PI
+                            );
+                            group.add(smallRock);
+                        }
+                    }
+
+                    this.mesh = group;
+                    this.mesh.userData.resourceNode = this;
+                    this.updateMeshPosition();
+                }
+
+                updateMeshPosition() {
+                    if (!this.mesh) return;
+
+                    const normal = this.position.clone().normalize();
+                    this.mesh.position.copy(this.position);
+
+                    // Orient to stand perpendicular to planet surface
+                    this.mesh.up.copy(normal);
+                    this.mesh.lookAt(this.position.clone().add(normal));
+                }
+
+                update(delta) {
+                    // Regenerate resources slowly
+                    this.amount = Math.min(this.maxAmount, this.amount + this.regenerationRate * delta);
+
+                    // Update visual based on amount (scale down when depleted)
+                    if (this.mesh) {
+                        const scale = 0.3 + (this.amount / this.maxAmount) * 0.7; // 30% to 100% scale
+                        this.mesh.scale.set(scale, scale, scale);
+                    }
+                }
+
+                harvest(amount) {
+                    const harvested = Math.min(amount, this.amount);
+                    this.amount -= harvested;
+                    return harvested;
+                }
+
+                destroy() {
+                    if (this.mesh) {
+                        planetGroup.remove(this.mesh);
+                        this.mesh = null;
+                    }
+                }
+            }
+
+            // Global resource node management
+            let resourceNodeId = 0;
+            const resourceNodes = [];
+
             let orgId = 0;
             const organisms = [];
             let selected = null;
@@ -2697,6 +3072,11 @@ class ParticleEffect {
                         tribeStrength: 0,
                         isTribalTerritory: false
                     };
+
+                    // Resource gathering (humanoids only)
+                    this.carryingResources = { food: 0, wood: 0, stone: 0 };
+                    this.gatheringTimer = 0;
+                    this.gatheringTarget = null; // ResourceNode being gathered
 
                     const sizes = { plant: 2.5, herbivore: 2, carnivore: 2.5, humanoid: 3 };
                     const speeds = { plant: 0, herbivore: 0.18, carnivore: 0.22, humanoid: 0.15 };
@@ -3151,6 +3531,72 @@ class ParticleEffect {
                     }
 
                     return child;
+                }
+
+                // Resource gathering (for humanoids)
+                gatherResource(resourceNode, delta) {
+                    if (this.type !== 'humanoid') return false;
+                    if (!resourceNode || resourceNode.amount <= 0) return false;
+
+                    this.gatheringTarget = resourceNode;
+                    this.gatheringTimer += delta;
+
+                    // Takes 3 seconds to gather
+                    if (this.gatheringTimer >= 3) {
+                        const gatherAmount = { wood: 10, stone: 8, food: 5 }[resourceNode.type] || 5;
+                        const harvested = resourceNode.harvest(gatherAmount);
+                        this.carryingResources[resourceNode.type] =
+                            (this.carryingResources[resourceNode.type] || 0) + harvested;
+                        this.gatheringTimer = 0;
+                        return true;
+                    }
+                    return false;
+                }
+
+                depositResources() {
+                    if (this.type !== 'humanoid' || !this.tribeId) return;
+
+                    const tribe = getTribeById(this.tribeId);
+                    if (tribe) {
+                        for (const resource in this.carryingResources) {
+                            tribe.resources[resource] += this.carryingResources[resource];
+                            this.carryingResources[resource] = 0;
+                        }
+                    }
+                }
+
+                // Attempt to build a structure (costs resources from tribe)
+                attemptBuild(buildingType) {
+                    if (this.type !== 'humanoid' || !this.tribeId) return null;
+
+                    const tribe = getTribeById(this.tribeId);
+                    if (!tribe) return null;
+
+                    // Check if we have a building stats for this type
+                    const tempBuilding = new Building(buildingType, new THREE.Vector3(), tribe);
+                    const cost = tempBuilding.stats.cost;
+                    tempBuilding.destroy(); // Clean up temp building
+
+                    // Check if tribe has enough resources
+                    if (tribe.resources.food >= cost.food &&
+                        tribe.resources.wood >= cost.wood &&
+                        tribe.resources.stone >= cost.stone) {
+
+                        // Deduct resources
+                        tribe.resources.food -= cost.food;
+                        tribe.resources.wood -= cost.wood;
+                        tribe.resources.stone -= cost.stone;
+
+                        // Create building at organism's position
+                        const building = new Building(buildingType, this.position.clone(), tribe);
+                        buildings.push(building);
+                        tribe.buildings.push(building);
+                        planetGroup.add(building.mesh);
+
+                        return building;
+                    }
+
+                    return null;
                 }
             }
 
