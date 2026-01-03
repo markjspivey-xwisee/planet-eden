@@ -4407,7 +4407,12 @@ class ParticleEffect {
 
             function updateCreatureList() {
                 const list = document.getElementById('creature-list');
-                const searchTerm = document.getElementById('search-input').value.toLowerCase();
+                const searchInput = document.getElementById('search-input');
+
+                // Skip if elements don't exist (removed in tribal version)
+                if (!list || !searchInput) return;
+
+                const searchTerm = searchInput.value.toLowerCase();
                 const activeFilter = document.querySelector('.filter-btn.active[data-filter]');
                 const filter = activeFilter ? activeFilter.dataset.filter : 'all';
 
@@ -5523,7 +5528,11 @@ class ParticleEffect {
                 });
             });
 
-            document.getElementById('search-input').addEventListener('input', updateCreatureList);
+            // Search input (if it exists - removed in tribal version)
+            const searchInput = document.getElementById('search-input');
+            if (searchInput) {
+                searchInput.addEventListener('input', updateCreatureList);
+            }
 
             // Chart
             const ctx = document.getElementById('population-chart').getContext('2d');
