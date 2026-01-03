@@ -3663,11 +3663,16 @@ class ParticleEffect {
                         // Plants reproduce faster to sustain ecosystem (no brain control)
                         return !this.dead && this.energy > 60 && this.reproduceTimer > 25;
                     } else {
-                        // BRAIN DECISION: Animals decide when to reproduce!
-                        // Must have minimum resources AND brain must want to reproduce
+                        // Check if organism has minimum resources
                         const hasResources = !this.dead && this.energy > 50 && this.health > 40 && this.reproduceTimer > 30;
-                        const wantsToReproduce = this.brainDecisions.shouldReproduce > 0.5;
-                        return hasResources && wantsToReproduce;
+                        if (!hasResources) return false;
+
+                        // SURVIVAL INSTINCT: When thriving (energy > 80), reproduce regardless of brain
+                        // Otherwise, BRAIN DECISION: Does the brain want to reproduce? (lowered threshold to 0.2)
+                        const isThriving = this.energy > 80;
+                        const wantsToReproduce = this.brainDecisions.shouldReproduce > 0.2;
+
+                        return isThriving || wantsToReproduce;
                     }
                 }
 
@@ -3905,7 +3910,33 @@ class ParticleEffect {
                         Math.sin(phi) * Math.sin(theta)
                     ).multiplyScalar(PLANET_RADIUS);
 
-                    organisms.push(new Organism(type, pos));
+                    const organism = new Organism(type, pos);
+                    organisms.push(organism);
+
+                    // TRIBAL FIX: Create initial tribes for humanoids (every 3 humanoids = 1 tribe)
+                    if (type === 'humanoid') {
+                        // Check if there's a nearby tribe (within 30 units)
+                        let nearbyTribe = null;
+                        for (const tribe of tribes.values()) {
+                            if (tribe.extinct) continue;
+                            const dist = pos.distanceTo(tribe.foundationPosition);
+                            if (dist < 30 && tribe.members.size < 4) {
+                                nearbyTribe = tribe;
+                                break;
+                            }
+                        }
+
+                        if (nearbyTribe) {
+                            // Join existing nearby tribe
+                            organism.tribeId = nearbyTribe.id;
+                            nearbyTribe.addMember(organism.id);
+                        } else {
+                            // Create new tribe
+                            const newTribe = new Tribe(organism.id, type, pos);
+                            tribes.set(newTribe.id, newTribe);
+                            organism.tribeId = newTribe.id;
+                        }
+                    }
                 }
             }
 
@@ -5048,7 +5079,7 @@ class ParticleEffect {
                     name: 'Balance Ecosystem',
                     targetType: 'global',
                     execute: () => {
-                        const targets = {plant: 50, herbivore: 15, carnivore: 5, humanoid: 4};
+                        const targets = {plant: 50, herbivore: 15, carnivore: 5, humanoid: 10};
                         const current = {plant: 0, herbivore: 0, carnivore: 0, humanoid: 0};
                         for (const o of organisms) {
                             if (!o.dead) current[o.type]++;
@@ -5617,7 +5648,7 @@ class ParticleEffect {
             spawnOrganism('plant', 100); // Increased for better sustainability
             spawnOrganism('herbivore', 20); // Balanced with more plants
             spawnOrganism('carnivore', 5); // Was 3, now 5
-            spawnOrganism('humanoid', 4); // Was 2, now 4
+            spawnOrganism('humanoid', 12); // Was 4, now 12 (creates 3-4 initial tribes)
 
             // Spawn resource nodes for tribal gathering
             function spawnResourceNodes() {
