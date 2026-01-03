@@ -4097,8 +4097,12 @@ class ParticleEffect {
                         const nearby = spatialGrid.getNearby(o.position);
                         for (const other of nearby) {
                             if (other.type === 'plant' && !other.dead && o.position.distanceTo(other.position) < 4) {
-                                // BRAIN DECISION: Should I eat this food?
-                                if (o.brainDecisions.shouldEat > 0.5) {
+                                // SURVIVAL INSTINCT: Always eat when starving (energy < 30)
+                                // Otherwise, BRAIN DECISION: Should I eat this food? (lowered threshold to 0.2)
+                                const isStarving = o.energy < 30;
+                                const wantsToEat = o.brainDecisions.shouldEat > 0.2;
+
+                                if (isStarving || wantsToEat) {
                                     o.eat(other);
                                     break;
                                 }
@@ -4111,8 +4115,12 @@ class ParticleEffect {
                         for (const other of nearby) {
                             if ((other.type === 'herbivore' || other.type === 'humanoid') &&
                                 !other.dead && o.position.distanceTo(other.position) < 4) {
-                                // BRAIN DECISION: Should I attack this prey?
-                                if (o.brainDecisions.shouldAttack > 0.5) {
+                                // SURVIVAL INSTINCT: Always hunt when starving (energy < 30)
+                                // Otherwise, BRAIN DECISION: Should I attack this prey? (lowered threshold to 0.2)
+                                const isStarving = o.energy < 30;
+                                const wantsToHunt = o.brainDecisions.shouldAttack > 0.2;
+
+                                if (isStarving || wantsToHunt) {
                                     o.eat(other);
                                     break;
                                 }
