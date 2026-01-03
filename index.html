@@ -2860,10 +2860,30 @@ class ParticleEffect {
             }
 
             // Building class for tribal structures
+            // ========== EQUIPMENT SYSTEM ==========
+            class Equipment {
+                constructor(type, level = 1) {
+                    this.type = type; // 'spear', 'sword', 'bow', 'shield', 'armor'
+                    this.level = level; // 1-3 (bronze, iron, steel)
+
+                    const stats = {
+                        spear: { damage: 3, defense: 0, cost: { wood: 15, stone: 5 } },
+                        sword: { damage: 5, defense: 0, cost: { wood: 10, stone: 15 } },
+                        bow: { damage: 4, defense: 0, cost: { wood: 20, stone: 5 } },
+                        shield: { damage: 0, defense: 4, cost: { wood: 20, stone: 10 } },
+                        armor: { damage: 0, defense: 6, cost: { wood: 5, stone: 25 } }
+                    };
+
+                    this.damageBonus = stats[type].damage * level;
+                    this.defenseBonus = stats[type].defense * level;
+                    this.cost = stats[type].cost;
+                }
+            }
+
             class Building {
                 constructor(type, position, tribe) {
                     this.id = buildingId++;
-                    this.type = type; // 'hut', 'farm', 'tower', 'temple', 'wall'
+                    this.type = type; // 'hut', 'farm', 'tower', 'temple', 'wall', 'barracks', 'smithy', 'mine', 'market', 'granary'
                     this.position = position.clone();
                     this.tribe = tribe;
                     this.level = 1;
@@ -2872,7 +2892,7 @@ class ParticleEffect {
                     this.isConstructed = false;
                     this.mesh = null;
 
-                    // Building stats by type
+                    // Building stats by type (expanded for Age of Empires style)
                     this.stats = {
                         hut: {
                             housingCapacity: 5,
@@ -2902,6 +2922,34 @@ class ParticleEffect {
                             defenseBonus: 0.5,
                             range: 3,
                             cost: { food: 5, wood: 15, stone: 35 }
+                        },
+                        barracks: {
+                            trainingSpeed: 1.5,
+                            attackBonus: 0.15,
+                            range: 15,
+                            cost: { food: 30, wood: 40, stone: 30 }
+                        },
+                        smithy: {
+                            equipmentCraftingSpeed: 2.0,
+                            damageBonus: 0.2,
+                            range: 12,
+                            cost: { food: 20, wood: 35, stone: 45 }
+                        },
+                        mine: {
+                            stoneProduction: 1.5,
+                            range: 10,
+                            cost: { food: 15, wood: 30, stone: 20 }
+                        },
+                        market: {
+                            resourceExchangeRate: 1.2,
+                            range: 20,
+                            cost: { food: 40, wood: 50, stone: 30 }
+                        },
+                        granary: {
+                            foodStorage: 500,
+                            foodPreservation: 0.9,
+                            range: 15,
+                            cost: { food: 35, wood: 45, stone: 15 }
                         }
                     }[type];
 
@@ -3362,6 +3410,13 @@ class ParticleEffect {
                     this.carryingResources = { food: 0, wood: 0, stone: 0 };
                     this.gatheringTimer = 0;
                     this.gatheringTarget = null; // ResourceNode being gathered
+
+                    // Equipment system (humanoids only) - AGE OF EMPIRES!
+                    this.equipment = {
+                        weapon: null,  // Spear, sword, or bow
+                        armor: null,   // Armor or shield
+                        craftingTimer: 0
+                    };
 
                     const sizes = { plant: 2.5, herbivore: 2, carnivore: 2.5, humanoid: 3 };
                     const speeds = { plant: 0, herbivore: 0.18, carnivore: 0.22, humanoid: 0.15 };
@@ -3948,12 +4003,17 @@ class ParticleEffect {
                     return null;
                 }
 
-                // Combat system with group bonuses and tribal warfare
+                // Combat system with group bonuses, tribal warfare, and EQUIPMENT!
                 attack(target) {
                     if (this.dead || target.dead) return false;
 
                     // STABILITY FIX: Reduced base damage from 10 to 5
                     let baseDamage = 5;
+
+                    // EQUIPMENT BONUS: Weapons increase damage!
+                    if (this.type === 'humanoid' && this.equipment.weapon) {
+                        baseDamage += this.equipment.weapon.damageBonus;
+                    }
 
                     // Building bonuses (from towers in range)
                     if (this.attackMultiplier) {
@@ -3987,7 +4047,13 @@ class ParticleEffect {
                         target.defenseMultiplier = 1; // Reset for next frame
                     }
 
-                    const finalDamage = baseDamage * defenseReduction;
+                    // EQUIPMENT BONUS: Armor reduces damage!
+                    let equipmentDefense = 1;
+                    if (target.type === 'humanoid' && target.equipment.armor) {
+                        equipmentDefense = 1 + (target.equipment.armor.defenseBonus / 10); // 10% reduction per defense point
+                    }
+
+                    const finalDamage = (baseDamage * defenseReduction) / equipmentDefense;
                     target.health -= finalDamage;
 
                     // Death handling
@@ -4347,9 +4413,10 @@ class ParticleEffect {
                             const tribe = getTribeById(o.tribeId);
                             if (tribe && tribe.buildings.length < 5) { // Max 5 buildings per tribe
                                 // Map building type priority to actual type
-                                const buildingTypes = ['hut', 'farm', 'tower', 'temple', 'wall'];
-                                const typeIndex = Math.floor((o.brainDecisions.buildingTypePriority + 1) * 2.5); // Maps [-1,1] to [0,5]
-                                const buildingType = buildingTypes[Math.min(typeIndex, 4)];
+                                // AGE OF EMPIRES: 10 building types!
+                                const buildingTypes = ['hut', 'farm', 'tower', 'temple', 'wall', 'barracks', 'smithy', 'mine', 'market', 'granary'];
+                                const typeIndex = Math.floor((o.brainDecisions.buildingTypePriority + 1) * 5); // Maps [-1,1] to [0,10]
+                                const buildingType = buildingTypes[Math.min(typeIndex, 9)];
 
                                 o.attemptBuild(buildingType);
                             }
