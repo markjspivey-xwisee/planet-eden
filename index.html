@@ -2597,10 +2597,97 @@ class ParticleEffect {
             }
 
             // ========== ORGANISMS ==========
+            // ========== SYMBOLIC LANGUAGE SYSTEM ==========
+            // Messages allow organisms to communicate and coordinate
+            class Message {
+                constructor(organism, symbol, urgency) {
+                    this.id = messageId++;
+                    this.senderId = organism.id;
+                    this.senderType = organism.type;
+                    this.tribeId = organism.tribeId;
+                    this.symbol = symbol; // 0-30 symbol ID
+                    this.urgency = urgency; // 0-1 importance
+                    this.position = organism.position.clone();
+                    this.timestamp = state.time;
+                    this.lifespan = 8; // Seconds before message expires
+                    this.age = 0;
+
+                    // Create visual indicator
+                    this.createVisual();
+                }
+
+                createVisual() {
+                    // Floating glowing symbol above organism
+                    const symbolIcons = [
+                        '🍖', '☠️', '🏃', '🏠', '⚔️', '🛡️',  // 0-5: food, danger, flee, shelter, attack, defend
+                        '🌾', '🪵', '🪨', '💎', '👥', '❤️',  // 6-11: farm, wood, stone, rare, group, friend
+                        '⚠️', '✅', '❌', '👑', '🎯', '📍',  // 12-17: warning, yes, no, leader, target, location
+                        '💪', '🤝', '🙏', '👋', '🎉', '😢',  // 18-23: strong, cooperate, help, hello, celebrate, sad
+                        '🔥', '💧', '⛰️', '🌲', '🌊', '☀️'   // 24-29: fire, water, mountain, forest, ocean, sun
+                    ];
+
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 64;
+                    canvas.height = 64;
+                    const ctx = canvas.getContext('2d');
+
+                    // Draw glowing background
+                    const glowColor = this.urgency > 0.7 ? '#ff4444' : (this.urgency > 0.4 ? '#ffaa00' : '#44ff44');
+                    ctx.fillStyle = glowColor;
+                    ctx.beginPath();
+                    ctx.arc(32, 32, 28, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Draw symbol
+                    ctx.font = 'bold 32px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillStyle = 'white';
+                    ctx.fillText(symbolIcons[Math.floor(this.symbol) % symbolIcons.length], 32, 32);
+
+                    const texture = new THREE.CanvasTexture(canvas);
+                    const material = new THREE.SpriteMaterial({
+                        map: texture,
+                        transparent: true,
+                        opacity: 0.9
+                    });
+                    this.sprite = new THREE.Sprite(material);
+                    this.sprite.scale.set(3, 3, 1);
+                    this.sprite.position.copy(this.position);
+                    this.sprite.position.y += 5; // Float above organism
+                    planetGroup.add(this.sprite);
+                }
+
+                update(delta) {
+                    this.age += delta;
+
+                    // Fade out as message ages
+                    const fadeRatio = 1 - (this.age / this.lifespan);
+                    if (this.sprite) {
+                        this.sprite.material.opacity = fadeRatio * 0.9;
+                        // Gentle floating animation
+                        this.sprite.position.y = this.position.y + 5 + Math.sin(state.time * 2) * 0.5;
+                    }
+
+                    return this.age < this.lifespan; // Returns false when expired
+                }
+
+                remove() {
+                    if (this.sprite) {
+                        planetGroup.remove(this.sprite);
+                        this.sprite.material.map.dispose();
+                        this.sprite.material.dispose();
+                    }
+                }
+            }
+
+            let messageId = 0;
+            const messages = []; // Global message pool
+
             class Brain {
                 constructor(complexity = 1) {
-                    // Create weights for 14 outputs (TRIBAL CIVILIZATION CONTROL)
-                    // OUTPUTS (14 total):
+                    // Create weights for 17 outputs (TRIBAL CIVILIZATION + LANGUAGE)
+                    // OUTPUTS (17 total):
                     // 0-2: moveX, moveY, moveZ (movement direction)
                     // 3: speedModifier (how fast to move)
                     // 4: shouldEat (whether to eat available food)
@@ -2613,21 +2700,30 @@ class ParticleEffect {
                     // 11: shouldGather (whether to gather resources)
                     // 12: groupFormation (pack tactics)
                     // 13: territorialDefense (defend territory)
+                    // 14: shouldSpeak (whether to broadcast a message) - NEW!
+                    // 15: symbolToSpeak (which symbol 0-30 to broadcast) - NEW!
+                    // 16: messageUrgency (0-1 how important the message is) - NEW!
                     this.weights = [];
-                    const weightsPerOutput = 12; // 12 inputs per output
-                    for (let output = 0; output < 14; output++) {
+                    const weightsPerOutput = 15; // 15 inputs per output (was 12)
+                    for (let output = 0; output < 17; output++) {
                         this.weights[output] = Array(weightsPerOutput * complexity).fill(0).map(() => Math.random() * 2 - 1);
                     }
                 }
 
                 think(inputs) {
-                    // Return 14 outputs for TRIBAL CIVILIZATION CONTROL
+                    // Expects 15 inputs now (was 12):
+                    // 0-11: Original inputs
+                    // 12: nearbyMessageSymbol (most recent message symbol heard, normalized 0-1)
+                    // 13: messageDistance (how far the message came from, normalized)
+                    // 14: messageAge (how old the message is, normalized)
+
+                    // Return 17 outputs for TRIBAL CIVILIZATION + LANGUAGE
                     const outputs = [];
-                    for (let i = 0; i < 14; i++) {
+                    for (let i = 0; i < 17; i++) {
                         const sum = inputs.reduce((s, input, j) => s + input * this.weights[i][j % this.weights[i].length], 0);
                         outputs.push(Math.tanh(sum));
                     }
-                    return outputs; // [moveX, moveY, moveZ, speed, eat, attack, reproduce, social, build, buildType, resPriority, gather, group, defend]
+                    return outputs;
                 }
 
                 clone() {
@@ -2638,7 +2734,7 @@ class ParticleEffect {
 
                 mutate() {
                     // Mutate a random weight in a random output
-                    const outputIdx = Math.floor(Math.random() * 14);
+                    const outputIdx = Math.floor(Math.random() * 17);
                     const weightIdx = Math.floor(Math.random() * this.weights[outputIdx].length);
                     this.weights[outputIdx][weightIdx] += (Math.random() - 0.5) * 0.4;
                 }
@@ -3484,7 +3580,37 @@ class ParticleEffect {
                         isTribalTerritory: false // Will be computed by territory system later
                     };
 
-                    // 12 INPUTS for full environmental and tribal awareness
+                    // LANGUAGE SYSTEM: Listen for nearby messages
+                    let nearbyMessageSymbol = 0;
+                    let messageDistance = 1; // Far by default
+                    let messageAge = 1; // Old by default
+
+                    if (this.type === 'humanoid' && this.tribeId) {
+                        // Find most recent message from tribe members within earshot
+                        let mostRecentMessage = null;
+                        let smallestAge = Infinity;
+
+                        for (const msg of messages) {
+                            // Only listen to messages from same tribe
+                            if (msg.tribeId !== this.tribeId) continue;
+
+                            const dist = this.position.distanceTo(msg.position);
+                            if (dist > 30) continue; // Too far to hear
+
+                            if (msg.age < smallestAge) {
+                                mostRecentMessage = msg;
+                                smallestAge = msg.age;
+                            }
+                        }
+
+                        if (mostRecentMessage) {
+                            nearbyMessageSymbol = mostRecentMessage.symbol / 30; // Normalize to 0-1
+                            messageDistance = this.position.distanceTo(mostRecentMessage.position) / 30;
+                            messageAge = mostRecentMessage.age / mostRecentMessage.lifespan;
+                        }
+                    }
+
+                    // 15 INPUTS for full environmental, tribal, and language awareness
                     const inputs = [
                         this.energy / 100,                           // 0: Energy level
                         this.health / 100,                           // 1: Health level
@@ -3497,10 +3623,13 @@ class ParticleEffect {
                         Math.min(nearbyTribeMates / 10, 1),         // 8: Tribe size (nearby members)
                         Math.min(tribeStrength / 100, 1),           // 9: Tribe strength
                         Math.min(nearbyEnemies / 10, 1),            // 10: Enemy proximity
-                        0                                            // 11: Ally proximity (reserved for future)
+                        0,                                           // 11: Ally proximity (reserved for future)
+                        nearbyMessageSymbol,                         // 12: Message symbol heard (0-1) - NEW!
+                        messageDistance,                             // 13: How far message came from (0-1) - NEW!
+                        messageAge                                   // 14: How old the message is (0-1) - NEW!
                     ];
 
-                    // Get neural network outputs: [moveX, moveY, moveZ, speed, eat, attack, reproduce, social, build, buildType, resPriority, gather, group, defend]
+                    // Get neural network outputs: [moveX, moveY, moveZ, speed, eat, attack, reproduce, social, build, buildType, resPriority, gather, group, defend, speak, symbol, urgency]
                     const outputs = this.brain.think(inputs);
 
                     // Store decisions for behavior control
@@ -3518,8 +3647,28 @@ class ParticleEffect {
                         resourcePriority: outputs[10],
                         shouldGather: outputs[11],
                         groupFormation: outputs[12],
-                        territorialDefense: outputs[13]
+                        territorialDefense: outputs[13],
+                        shouldSpeak: outputs[14],                    // NEW: Language output!
+                        symbolToSpeak: outputs[15],                  // NEW: Which symbol to broadcast
+                        messageUrgency: (outputs[16] + 1) / 2        // NEW: Message importance (0-1)
                     };
+
+                    // LANGUAGE SYSTEM: Broadcast message if brain wants to speak
+                    if (this.type === 'humanoid' && this.tribeId && this.brainDecisions.shouldSpeak > 0.6) {
+                        // Convert brain output to symbol ID (0-30)
+                        const symbolId = Math.floor((this.brainDecisions.symbolToSpeak + 1) * 15); // Maps [-1,1] to [0,30]
+                        const urgency = this.brainDecisions.messageUrgency;
+
+                        // Create and broadcast message (cooldown to prevent spam)
+                        if (!this.lastMessageTime || (state.time - this.lastMessageTime) > 3) {
+                            const message = new Message(this, symbolId, urgency);
+                            messages.push(message);
+                            this.lastMessageTime = state.time;
+
+                            // Small energy cost for speaking
+                            this.energy -= 0.5;
+                        }
+                    }
 
                     // FULL NEURAL NETWORK CONTROL - brain decides EVERYTHING!
                     const normal = this.position.clone().normalize();
@@ -3598,20 +3747,26 @@ class ParticleEffect {
                     }
 
                     // Living organism logic
-                    // Reduced base energy drain for better survival
-                    this.energy -= delta * 0.15; // Was 0.35, now 0.15
+                    // STABILITY FIX: Minimal energy drain for sustainable ecosystem
+                    this.energy -= delta * 0.05; // Was 0.15, now 0.05 (minimal base drain)
                     this.reproduceTimer += delta;
 
                     if (this.type !== 'plant') {
                         this.think(spatialGrid);
                         this.position.add(this.velocity);
                         this.position.normalize().multiplyScalar(PLANET_RADIUS);
-                        // Reduced movement cost for better survival
-                        this.energy -= this.velocity.length() * 0.6; // Was 1.2, now 0.6
+                        // STABILITY FIX: Much lower movement cost (was 0.6, now 0.08)
+                        this.energy -= this.velocity.length() * 0.08;
                     } else {
-                        // Increased plant energy gain for faster reproduction
-                        this.energy += delta * 0.8; // Was 0.5, now 0.8
+                        // Plants generate energy from sunlight
+                        this.energy += delta * 1.2; // Was 0.8, now 1.2 (faster plant growth)
                         this.energy = Math.min(this.energy, 100);
+                    }
+
+                    // STABILITY FIX: Natural health regeneration
+                    if (this.health < 100 && this.energy > 30) {
+                        this.health += delta * 2; // Regenerate 2 health per second
+                        this.health = Math.min(this.health, 100);
                     }
 
                     // Increased max age for longer lifespans (was 500, now 800)
@@ -3797,7 +3952,8 @@ class ParticleEffect {
                 attack(target) {
                     if (this.dead || target.dead) return false;
 
-                    let baseDamage = 10;
+                    // STABILITY FIX: Reduced base damage from 10 to 5
+                    let baseDamage = 5;
 
                     // Building bonuses (from towers in range)
                     if (this.attackMultiplier) {
@@ -6501,6 +6657,15 @@ class ParticleEffect {
                     state.time += delta;
                     planetGroup.rotation.y += 0.0002 * delta;
                     updateEcosystem(delta);
+
+                    // LANGUAGE SYSTEM: Update messages (fade and expire)
+                    for (let i = messages.length - 1; i >= 0; i--) {
+                        const stillActive = messages[i].update(delta);
+                        if (!stillActive) {
+                            messages[i].remove();
+                            messages.splice(i, 1);
+                        }
+                    }
 
                     // Day/Night Cycle
                     const prevDayTime = state.dayTime;
