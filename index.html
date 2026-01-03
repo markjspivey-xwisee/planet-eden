@@ -2162,14 +2162,16 @@ class ParticleEffect {
                     name: 'THREE',
                     urls: [
                         'https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js',
-                        'https://unpkg.com/three@0.158.0/build/three.min.js'
+                        'https://unpkg.com/three@0.158.0/build/three.min.js',
+                        'https://cdnjs.cloudflare.com/ajax/libs/three.js/r158/three.min.js'
                     ]
                 },
                 chart: {
                     name: 'Chart',
                     urls: [
                         'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js',
-                        'https://unpkg.com/chart.js@4.4.0/dist/chart.umd.min.js'
+                        'https://unpkg.com/chart.js@4.4.0/dist/chart.umd.min.js',
+                        'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js'
                     ]
                 }
             };
@@ -2194,12 +2196,25 @@ class ParticleEffect {
             function tryLoad(lib, i = 0) {
                 return new Promise((resolve, reject) => {
                     if (i >= lib.urls.length) {
-                        reject(new Error('Failed'));
+                        console.error(`Failed to load ${lib.name} from all CDNs`);
+                        reject(new Error(`Failed to load ${lib.name}`));
                         return;
                     }
+                    console.log(`Trying to load ${lib.name} from ${lib.urls[i]}`);
                     loadScript(lib.urls[i])
-                        .then(() => window[lib.name] ? resolve() : Promise.reject())
-                        .catch(() => tryLoad(lib, i + 1).then(resolve).catch(reject));
+                        .then(() => {
+                            if (window[lib.name]) {
+                                console.log(`✓ ${lib.name} loaded successfully`);
+                                resolve();
+                            } else {
+                                console.warn(`${lib.name} loaded but not found in window`);
+                                Promise.reject();
+                            }
+                        })
+                        .catch((err) => {
+                            console.warn(`Failed to load ${lib.name} from ${lib.urls[i]}:`, err);
+                            tryLoad(lib, i + 1).then(resolve).catch(reject);
+                        });
                 });
             }
 
@@ -2209,13 +2224,15 @@ class ParticleEffect {
             ])
             .then(() => {
                 updateProgress(100, 'Ready!');
+                console.log('All libraries loaded successfully!');
                 setTimeout(() => {
                     document.getElementById('loading-screen').classList.add('hidden');
                 }, 300);
                 init();
             })
-            .catch(() => {
-                updateProgress(0, 'Failed to load. Check connection.');
+            .catch((err) => {
+                console.error('Library loading failed:', err);
+                updateProgress(0, 'Failed to load. Check console (F12) for details.');
             });
         })();
 
