@@ -2233,6 +2233,25 @@ class ParticleEffect {
              * 10. Optimized Noise Functions - Hash-based with cache-friendly operations
              * =================================================================== */
 
+            // Safe storage wrapper to handle tracking prevention
+            const safeStorage = {
+                getItem: (key) => {
+                    try {
+                        return localStorage.getItem(key);
+                    } catch (e) {
+                        console.warn('Storage access blocked:', e.message);
+                        return null;
+                    }
+                },
+                setItem: (key, value) => {
+                    try {
+                        localStorage.setItem(key, value);
+                    } catch (e) {
+                        console.warn('Storage access blocked:', e.message);
+                    }
+                }
+            };
+
             const scene = new THREE.Scene();
             scene.background = new THREE.Color(0x050510);
             scene.fog = new THREE.FogExp2(0x050510, 0.00012);
@@ -5616,7 +5635,7 @@ class ParticleEffect {
             };
 
             // Load settings from localStorage
-            const savedSettings = localStorage.getItem('planetEdenSettings');
+            const savedSettings = safeStorage.getItem('planetEdenSettings');
             if (savedSettings) {
                 Object.assign(gameSettings, JSON.parse(savedSettings));
             }
@@ -5648,7 +5667,7 @@ class ParticleEffect {
             document.getElementById('btn-start-game').onclick = () => {
                 if (document.getElementById('skip-tutorial').checked) {
                     gameSettings.skipTutorial = true;
-                    localStorage.setItem('planetEdenSettings', JSON.stringify(gameSettings));
+                    safeStorage.setItem('planetEdenSettings', JSON.stringify(gameSettings));
                 }
                 document.getElementById('welcome-screen').style.display = 'none';
                 playSound(800, 100);
@@ -5670,7 +5689,7 @@ class ParticleEffect {
                 gameSettings.soundEnabled = document.getElementById('setting-sound').checked;
                 gameSettings.showFPS = document.getElementById('setting-fps').checked;
 
-                localStorage.setItem('planetEdenSettings', JSON.stringify(gameSettings));
+                safeStorage.setItem('planetEdenSettings', JSON.stringify(gameSettings));
                 document.getElementById('settings-panel').style.display = 'none';
 
                 // Apply settings
@@ -5748,14 +5767,14 @@ class ParticleEffect {
                             dead: o.dead
                         }))
                     };
-                    localStorage.setItem('planetEdenWorld', JSON.stringify(worldState));
+                    safeStorage.setItem('planetEdenWorld', JSON.stringify(worldState));
                     showNotification('💾 World saved!');
                     playSound(1000, 200);
                 }
 
                 if (e.ctrlKey && e.key.toLowerCase() === 'l') {
                     e.preventDefault();
-                    const savedWorld = localStorage.getItem('planetEdenWorld');
+                    const savedWorld = safeStorage.getItem('planetEdenWorld');
                     if (savedWorld) {
                         const worldState = JSON.parse(savedWorld);
                         // Clear current organisms
@@ -6436,7 +6455,7 @@ class ParticleEffect {
                                 dead: o.dead
                             }))
                         };
-                        localStorage.setItem('planetEdenAutoSave', JSON.stringify(worldState));
+                        safeStorage.setItem('planetEdenAutoSave', JSON.stringify(worldState));
                     }
                 }
 
