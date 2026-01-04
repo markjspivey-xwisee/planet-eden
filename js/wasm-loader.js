@@ -7,7 +7,7 @@ export class WasmModule {
         this.exports = null;
     }
 
-    async load(wasmPath = '/zig-out/bin/planet-eden.wasm') {
+    async load(wasmPath = './zig-out/bin/planet-eden.wasm') {
         try {
             // Fetch and instantiate WASM module
             const response = await fetch(wasmPath);
