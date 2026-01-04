@@ -74,6 +74,7 @@ export class WeatherSystem {
 
     createCloudCell(baseMaterial, index) {
         const cloudGroup = new THREE.Group();
+        cloudGroup.userData.cloudIndex = index;
 
         // Random position on sphere
         const theta = Math.random() * Math.PI * 2;
@@ -212,6 +213,121 @@ export class WeatherSystem {
     createLightning() {
         this.lightningLight = new THREE.PointLight(0xffffff, 0, 100);
         this.scene.add(this.lightningLight);
+
+        // Lightning bolt mesh
+        this.lightningBolt = null;
+        this.lightningBoltGroup = new THREE.Group();
+        this.scene.add(this.lightningBoltGroup);
+
+        // Callback for when lightning strikes (for damage handling)
+        this.onLightningStrike = null;
+    }
+
+    // Set callback for lightning strike events
+    setLightningCallback(callback) {
+        this.onLightningStrike = callback;
+    }
+
+    // Create a visual lightning bolt from cloud to ground
+    createLightningBolt(cloud) {
+        // Clear previous bolt
+        while (this.lightningBoltGroup.children.length > 0) {
+            const child = this.lightningBoltGroup.children[0];
+            this.lightningBoltGroup.remove(child);
+            if (child.geometry) child.geometry.dispose();
+            if (child.material) child.material.dispose();
+        }
+
+        const cloudPos = cloud.group.position.clone();
+        const cloudNormal = cloudPos.clone().normalize();
+
+        // Calculate strike position on ground (below cloud)
+        const strikeRadius = this.planetRadius + 0.5; // Just above terrain
+        const strikePos = cloudNormal.clone().multiplyScalar(strikeRadius);
+
+        // Create jagged lightning path
+        const segments = 8 + Math.floor(Math.random() * 5);
+        const points = [];
+        const midpoint = new THREE.Vector3().lerpVectors(cloudPos, strikePos, 0.5);
+
+        for (let i = 0; i <= segments; i++) {
+            const t = i / segments;
+            const point = new THREE.Vector3().lerpVectors(cloudPos, strikePos, t);
+
+            // Add randomness to create jagged effect (more in the middle)
+            if (i > 0 && i < segments) {
+                const jitterAmount = 2 * (1 - Math.abs(t - 0.5) * 2);
+                const perpX = new THREE.Vector3().crossVectors(cloudNormal, new THREE.Vector3(1, 0, 0)).normalize();
+                const perpZ = new THREE.Vector3().crossVectors(cloudNormal, perpX).normalize();
+
+                point.add(perpX.multiplyScalar((Math.random() - 0.5) * jitterAmount));
+                point.add(perpZ.multiplyScalar((Math.random() - 0.5) * jitterAmount));
+            }
+
+            points.push(point);
+        }
+
+        // Create main bolt
+        const geometry = new THREE.BufferGeometry().setFromPoints(points);
+        const material = new THREE.LineBasicMaterial({
+            color: 0xaaddff,
+            linewidth: 3,
+            transparent: true,
+            opacity: 1
+        });
+        const bolt = new THREE.Line(geometry, material);
+        this.lightningBoltGroup.add(bolt);
+
+        // Create glow effect (thicker white bolt behind)
+        const glowMaterial = new THREE.LineBasicMaterial({
+            color: 0xffffff,
+            linewidth: 5,
+            transparent: true,
+            opacity: 0.8
+        });
+        const glowBolt = new THREE.Line(geometry.clone(), glowMaterial);
+        this.lightningBoltGroup.add(glowBolt);
+
+        // Add branch bolts
+        const branchCount = 1 + Math.floor(Math.random() * 3);
+        for (let b = 0; b < branchCount; b++) {
+            const startIdx = 2 + Math.floor(Math.random() * (segments - 3));
+            const startPoint = points[startIdx].clone();
+
+            // Branch off in random direction
+            const branchDir = new THREE.Vector3(
+                (Math.random() - 0.5) * 2,
+                (Math.random() - 0.5) * 2,
+                (Math.random() - 0.5) * 2
+            ).normalize();
+
+            const branchPoints = [startPoint];
+            let currentPoint = startPoint.clone();
+            const branchSegs = 2 + Math.floor(Math.random() * 3);
+
+            for (let s = 0; s < branchSegs; s++) {
+                const step = 0.5 + Math.random() * 1;
+                currentPoint = currentPoint.clone().add(branchDir.clone().multiplyScalar(step));
+                currentPoint.add(new THREE.Vector3(
+                    (Math.random() - 0.5) * 0.5,
+                    (Math.random() - 0.5) * 0.5,
+                    (Math.random() - 0.5) * 0.5
+                ));
+                branchPoints.push(currentPoint);
+            }
+
+            const branchGeo = new THREE.BufferGeometry().setFromPoints(branchPoints);
+            const branchMat = new THREE.LineBasicMaterial({
+                color: 0x88bbff,
+                linewidth: 1,
+                transparent: true,
+                opacity: 0.6
+            });
+            const branch = new THREE.Line(branchGeo, branchMat);
+            this.lightningBoltGroup.add(branch);
+        }
+
+        return strikePos;
     }
 
     update(deltaMs, timeInfo) {
@@ -527,11 +643,25 @@ export class WeatherSystem {
         if (!this.lightningLight) return;
 
         this.activeLightningCloud = cloud;
-        this.lightningTimer = 0.15; // Flash duration
+        this.lightningTimer = 0.3; // Flash duration (longer for bolt visibility)
 
-        // Position lightning at cloud
-        this.lightningLight.position.copy(cloud.group.position);
-        this.lightningLight.intensity = 5;
+        // Create visual lightning bolt and get strike position
+        const strikePos = this.createLightningBolt(cloud);
+
+        // Position lightning light at strike point
+        this.lightningLight.position.copy(strikePos);
+        this.lightningLight.intensity = 8;
+
+        // Notify callback of lightning strike for damage handling
+        if (this.onLightningStrike && strikePos) {
+            this.onLightningStrike({
+                position: strikePos,
+                cloudPosition: cloud.group.position.clone(),
+                intensity: cloud.weatherIntensity
+            });
+        }
+
+        console.log('[Weather] Lightning strike at', strikePos.x.toFixed(1), strikePos.y.toFixed(1), strikePos.z.toFixed(1));
     }
 
     updateLightning(deltaSeconds) {
@@ -539,11 +669,27 @@ export class WeatherSystem {
 
         if (this.lightningTimer > 0) {
             this.lightningTimer -= deltaSeconds;
-            // Flicker effect
-            this.lightningLight.intensity = Math.random() > 0.3 ? 4 + Math.random() * 3 : 0;
+            // Flicker effect for light
+            this.lightningLight.intensity = Math.random() > 0.3 ? 4 + Math.random() * 4 : 0;
+
+            // Fade out lightning bolt
+            const fadeProgress = this.lightningTimer / 0.3;
+            for (const child of this.lightningBoltGroup.children) {
+                if (child.material) {
+                    child.material.opacity = fadeProgress;
+                }
+            }
         } else {
             this.lightningLight.intensity = 0;
             this.activeLightningCloud = null;
+
+            // Clear lightning bolt
+            while (this.lightningBoltGroup.children.length > 0) {
+                const child = this.lightningBoltGroup.children[0];
+                this.lightningBoltGroup.remove(child);
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) child.material.dispose();
+            }
         }
     }
 

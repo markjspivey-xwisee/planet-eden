@@ -58,6 +58,13 @@ export class Renderer {
         this.SEED_RADIUS = 8; // How far seeds can spread
         this.MAX_PLANTS_NEARBY = 5; // Prevents overcrowding
 
+        // Fire system
+        this.fires = new Map(); // id -> { mesh, position, intensity, spreadTimer, targetId, targetType }
+        this.fireIdCounter = 0;
+        this.FIRE_SPREAD_RATE = 0.5; // Chance per second to spread
+        this.FIRE_SPREAD_RADIUS = 5; // How far fire can spread
+        this.FIRE_DAMAGE_RATE = 10; // Damage per second
+
         // Initialize time system
         this.timeSystem = new TimeSystem({
             dayLengthSeconds: 120, // 2 minutes per day
@@ -161,6 +168,7 @@ export class Renderer {
             rockGroup.position.copy(surfaceInfo.position);
             rockGroup.quaternion.copy(surfaceInfo.quaternion);
             rockGroup.scale.setScalar(1.5);
+            rockGroup.userData.resourceId = i;
 
             this.planetGroup.add(rockGroup);
             this.resources.set(i, {
@@ -603,6 +611,247 @@ export class Renderer {
             console.log(`[Weather] Changed to: ${weather}`);
             this.updateWeatherDisplay(weather);
         };
+
+        // Set up lightning strike callback
+        this.weatherSystem.setLightningCallback((strikeData) => {
+            this.handleLightningStrike(strikeData);
+        });
+    }
+
+    // Handle lightning strike - damage creatures and potentially start fires
+    handleLightningStrike(strikeData) {
+        const strikePos = strikeData.position;
+        const strikeRadius = 3; // Damage radius
+
+        console.log('[Renderer] Processing lightning strike');
+
+        // Check for organisms near the strike
+        const data = this.wasmModule.getOrganismData();
+        if (data) {
+            for (let i = 0; i < data.count; i++) {
+                if (!data.alive[i]) continue;
+
+                const mesh = this.organisms.get(i);
+                if (!mesh) continue;
+
+                const dist = mesh.position.distanceTo(strikePos);
+                if (dist < strikeRadius) {
+                    // Direct hit - major damage or kill
+                    const damage = 80 + Math.random() * 40; // 80-120 damage
+                    data.healths[i] = Math.max(0, data.healths[i] - damage);
+
+                    console.log(`[Lightning] Hit organism ${i} for ${damage.toFixed(0)} damage!`);
+
+                    // 30% chance to start fire on plants
+                    if (data.types[i] === 0 && Math.random() < 0.3) {
+                        this.startFire(i, 'organism', mesh.position.clone());
+                    }
+                }
+            }
+        }
+
+        // Check for buildings near the strike
+        for (const [id, building] of this.buildings) {
+            const dist = building.mesh.position.distanceTo(strikePos);
+            if (dist < strikeRadius * 1.5) {
+                // Hit building
+                building.health = Math.max(0, building.health - 30);
+                console.log(`[Lightning] Hit building ${id}!`);
+
+                // 50% chance to start fire on buildings
+                if (Math.random() < 0.5) {
+                    this.startFire(id, 'building', building.mesh.position.clone());
+                }
+            }
+        }
+
+        // Small chance to start ground fire even if nothing was hit
+        if (Math.random() < 0.15) {
+            this.startFire(null, 'ground', strikePos);
+        }
+    }
+
+    // Start a fire at a location
+    startFire(targetId, targetType, position) {
+        const fireId = this.fireIdCounter++;
+
+        // Create fire visual
+        const fireGroup = new THREE.Group();
+
+        // Main flame
+        const flameGeo = new THREE.ConeGeometry(0.3, 1.2, 8);
+        const flameMat = new THREE.MeshBasicMaterial({
+            color: 0xff6600,
+            transparent: true,
+            opacity: 0.9
+        });
+        const flame = new THREE.Mesh(flameGeo, flameMat);
+        flame.position.y = 0.6;
+        fireGroup.add(flame);
+
+        // Inner bright core
+        const coreGeo = new THREE.ConeGeometry(0.15, 0.8, 8);
+        const coreMat = new THREE.MeshBasicMaterial({
+            color: 0xffff44,
+            transparent: true,
+            opacity: 0.95
+        });
+        const core = new THREE.Mesh(coreGeo, coreMat);
+        core.position.y = 0.4;
+        fireGroup.add(core);
+
+        // Point light for fire glow
+        const fireLight = new THREE.PointLight(0xff4400, 2, 8);
+        fireLight.position.y = 0.5;
+        fireGroup.add(fireLight);
+
+        fireGroup.position.copy(position);
+        fireGroup.userData.fireId = fireId;
+        this.planetGroup.add(fireGroup);
+
+        this.fires.set(fireId, {
+            mesh: fireGroup,
+            position: position.clone(),
+            intensity: 1,
+            spreadTimer: 2 + Math.random() * 3, // Time until spread attempt
+            burnTimer: 15 + Math.random() * 15, // How long it burns
+            targetId: targetId,
+            targetType: targetType,
+            animPhase: Math.random() * Math.PI * 2
+        });
+
+        console.log(`[Fire] Started fire ${fireId} at ${targetType}${targetId !== null ? ' #' + targetId : ''}`);
+    }
+
+    // Update all fires
+    updateFires(deltaSeconds) {
+        const firesToRemove = [];
+        const data = this.wasmModule.getOrganismData();
+
+        for (const [id, fire] of this.fires) {
+            // Animate fire
+            fire.animPhase += deltaSeconds * 8;
+            const flicker = 0.8 + Math.sin(fire.animPhase) * 0.2 + Math.random() * 0.1;
+
+            if (fire.mesh.children.length > 0) {
+                // Animate flame size
+                fire.mesh.children[0].scale.set(flicker, 0.9 + Math.sin(fire.animPhase * 1.5) * 0.2, flicker);
+                fire.mesh.children[1].scale.set(flicker * 0.8, 0.85 + Math.sin(fire.animPhase * 2) * 0.15, flicker * 0.8);
+
+                // Update light intensity
+                if (fire.mesh.children[2] && fire.mesh.children[2].isLight) {
+                    fire.mesh.children[2].intensity = 1.5 + Math.random() * 1;
+                }
+            }
+
+            // Damage target
+            if (fire.targetId !== null && data) {
+                if (fire.targetType === 'organism') {
+                    const idx = fire.targetId;
+                    if (idx < data.count && data.alive[idx]) {
+                        data.healths[idx] -= this.FIRE_DAMAGE_RATE * deltaSeconds;
+                        if (data.healths[idx] <= 0) {
+                            fire.targetId = null; // Target destroyed
+                        }
+                    }
+                } else if (fire.targetType === 'building') {
+                    const building = this.buildings.get(fire.targetId);
+                    if (building) {
+                        building.health -= this.FIRE_DAMAGE_RATE * 0.5 * deltaSeconds;
+                        if (building.health <= 0) {
+                            // Building destroyed
+                            this.planetGroup.remove(building.mesh);
+                            this.buildings.delete(fire.targetId);
+                            fire.targetId = null;
+                        }
+                    }
+                }
+            }
+
+            // Spread timer
+            fire.spreadTimer -= deltaSeconds;
+            if (fire.spreadTimer <= 0) {
+                fire.spreadTimer = 3 + Math.random() * 4;
+
+                // Try to spread to nearby objects
+                if (Math.random() < this.FIRE_SPREAD_RATE) {
+                    this.trySpreadFire(fire);
+                }
+            }
+
+            // Burn timer
+            fire.burnTimer -= deltaSeconds;
+            fire.intensity = Math.max(0.2, fire.burnTimer / 15);
+
+            if (fire.burnTimer <= 0) {
+                firesToRemove.push(id);
+            }
+        }
+
+        // Remove expired fires
+        for (const id of firesToRemove) {
+            const fire = this.fires.get(id);
+            if (fire && fire.mesh) {
+                this.planetGroup.remove(fire.mesh);
+                fire.mesh.traverse(child => {
+                    if (child.geometry) child.geometry.dispose();
+                    if (child.material) child.material.dispose();
+                });
+            }
+            this.fires.delete(id);
+            console.log(`[Fire] Fire ${id} burned out`);
+        }
+    }
+
+    // Try to spread fire to nearby flammable objects
+    trySpreadFire(fire) {
+        // Check nearby organisms (plants are flammable)
+        const data = this.wasmModule.getOrganismData();
+        if (data) {
+            for (let i = 0; i < data.count; i++) {
+                if (!data.alive[i]) continue;
+                if (data.types[i] !== 0) continue; // Only plants catch fire
+
+                const mesh = this.organisms.get(i);
+                if (!mesh) continue;
+
+                const dist = mesh.position.distanceTo(fire.position);
+                if (dist < this.FIRE_SPREAD_RADIUS && dist > 0.5) {
+                    // Check if this target is already on fire
+                    let alreadyOnFire = false;
+                    for (const [fid, f] of this.fires) {
+                        if (f.targetType === 'organism' && f.targetId === i) {
+                            alreadyOnFire = true;
+                            break;
+                        }
+                    }
+
+                    if (!alreadyOnFire && Math.random() < 0.4) {
+                        this.startFire(i, 'organism', mesh.position.clone());
+                        return; // Only spread to one target per attempt
+                    }
+                }
+            }
+        }
+
+        // Check nearby buildings
+        for (const [id, building] of this.buildings) {
+            const dist = building.mesh.position.distanceTo(fire.position);
+            if (dist < this.FIRE_SPREAD_RADIUS && dist > 0.5) {
+                let alreadyOnFire = false;
+                for (const [fid, f] of this.fires) {
+                    if (f.targetType === 'building' && f.targetId === id) {
+                        alreadyOnFire = true;
+                        break;
+                    }
+                }
+
+                if (!alreadyOnFire && Math.random() < 0.3) {
+                    this.startFire(id, 'building', building.mesh.position.clone());
+                    return;
+                }
+            }
+        }
     }
 
     updateWeatherDisplay(weather) {
@@ -653,9 +902,63 @@ export class Renderer {
             }
         }
 
+        // Check resources
+        const resourceMeshes = Array.from(this.resources.values()).map(r => r.mesh);
+        const resourceIntersects = this.raycaster.intersectObjects(resourceMeshes, true);
+
+        if (resourceIntersects.length > 0) {
+            let obj = resourceIntersects[0].object;
+            while (obj && obj.userData.resourceId === undefined) {
+                obj = obj.parent;
+            }
+            if (obj && obj.userData.resourceId !== undefined) {
+                this.selectResource(obj.userData.resourceId);
+                return;
+            }
+            // Fallback - find by mesh reference
+            for (const [id, res] of this.resources) {
+                if (res.mesh === obj || res.mesh.children.includes(resourceIntersects[0].object)) {
+                    this.selectResource(id);
+                    return;
+                }
+            }
+        }
+
+        // Check clouds
+        if (this.weatherSystem && this.weatherSystem.cloudGroup) {
+            const cloudMeshes = [];
+            this.weatherSystem.cloudGroup.traverse(child => {
+                if (child.isMesh) cloudMeshes.push(child);
+            });
+            const cloudIntersects = this.raycaster.intersectObjects(cloudMeshes, true);
+
+            if (cloudIntersects.length > 0) {
+                // Find which cloud was clicked
+                let obj = cloudIntersects[0].object;
+                while (obj && !obj.userData.cloudIndex && obj.parent) {
+                    obj = obj.parent;
+                }
+                if (obj.userData.cloudIndex !== undefined) {
+                    this.selectCloud(obj.userData.cloudIndex);
+                    return;
+                }
+                // Try to find by parent group
+                for (let i = 0; i < this.weatherSystem.clouds.length; i++) {
+                    if (this.weatherSystem.clouds[i].group.children.some(c =>
+                        c === cloudIntersects[0].object || c.children?.includes(cloudIntersects[0].object)
+                    )) {
+                        this.selectCloud(i);
+                        return;
+                    }
+                }
+            }
+        }
+
         // Nothing clicked - deselect all
         this.deselectOrganism();
         this.deselectBuilding();
+        this.deselectResource();
+        this.deselectCloud();
     }
 
     onMouseMove(event) {
@@ -677,7 +980,35 @@ export class Renderer {
         const buildingMeshes = Array.from(this.buildings.values()).map(b => b.mesh);
         const buildingIntersects = this.raycaster.intersectObjects(buildingMeshes, true);
 
-        this.renderer.domElement.style.cursor = buildingIntersects.length > 0 ? 'pointer' : 'default';
+        if (buildingIntersects.length > 0) {
+            this.renderer.domElement.style.cursor = 'pointer';
+            return;
+        }
+
+        // Check resources
+        const resourceMeshes = Array.from(this.resources.values()).map(r => r.mesh);
+        const resourceIntersects = this.raycaster.intersectObjects(resourceMeshes, true);
+
+        if (resourceIntersects.length > 0) {
+            this.renderer.domElement.style.cursor = 'pointer';
+            return;
+        }
+
+        // Check clouds
+        if (this.weatherSystem && this.weatherSystem.cloudGroup) {
+            const cloudMeshes = [];
+            this.weatherSystem.cloudGroup.traverse(child => {
+                if (child.isMesh) cloudMeshes.push(child);
+            });
+            const cloudIntersects = this.raycaster.intersectObjects(cloudMeshes, true);
+
+            if (cloudIntersects.length > 0) {
+                this.renderer.domElement.style.cursor = 'pointer';
+                return;
+            }
+        }
+
+        this.renderer.domElement.style.cursor = 'default';
     }
 
     selectOrganism(id) {
@@ -883,6 +1214,236 @@ export class Renderer {
         }
     }
 
+    // Resource selection
+    selectResource(resourceId) {
+        this.deselectOrganism();
+        this.deselectBuilding();
+        this.deselectResource();
+        this.deselectCloud();
+
+        this.selectedResource = resourceId;
+        const resource = this.resources.get(resourceId);
+
+        if (resource && resource.mesh) {
+            // Add selection ring
+            const ringGeometry = new THREE.RingGeometry(2.5, 3, 32);
+            const ringMaterial = new THREE.MeshBasicMaterial({
+                color: 0x00ffff,
+                side: THREE.DoubleSide,
+                transparent: true,
+                opacity: 0.8
+            });
+            this.resourceSelectionRing = new THREE.Mesh(ringGeometry, ringMaterial);
+            this.resourceSelectionRing.rotation.x = Math.PI / 2;
+            this.resourceSelectionRing.position.y = 0.3;
+            resource.mesh.add(this.resourceSelectionRing);
+
+            this.showResourcePanel(resourceId);
+        }
+    }
+
+    deselectResource() {
+        if (this.resourceSelectionRing) {
+            this.resourceSelectionRing.parent?.remove(this.resourceSelectionRing);
+            this.resourceSelectionRing = null;
+        }
+        this.selectedResource = null;
+        this.hideResourcePanel();
+    }
+
+    showResourcePanel(resourceId) {
+        const resource = this.resources.get(resourceId);
+        if (!resource) return;
+
+        this.hideResourcePanel();
+
+        this.resourcePanel = document.createElement('div');
+        this.resourcePanel.style.cssText = `
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(20, 30, 30, 0.95);
+            border: 2px solid rgba(0, 255, 255, 0.6);
+            border-radius: 12px;
+            padding: 1.5rem;
+            color: white;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            min-width: 250px;
+            z-index: 1000;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        `;
+
+        const resourceTypes = {
+            0: { name: 'Stone', icon: '\u{1FAA8}', color: '#888' },
+            1: { name: 'Iron Ore', icon: '\u2699', color: '#B87333' },
+            2: { name: 'Gold Ore', icon: '\u{1F947}', color: '#FFD700' },
+            3: { name: 'Crystal', icon: '\u{1F48E}', color: '#88ffff' }
+        };
+
+        const typeInfo = resourceTypes[resource.type] || { name: 'Resource', icon: '\u{1FAA8}', color: '#888' };
+
+        this.resourcePanel.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                <div style="font-size: 1.3rem; color: ${typeInfo.color};">
+                    ${typeInfo.icon} ${typeInfo.name}
+                </div>
+                <button id="resource-close-btn" style="background: none; border: none; color: #888; font-size: 1.5rem; cursor: pointer; padding: 0;">&times;</button>
+            </div>
+
+            <div style="margin: 1rem 0;">
+                <div style="font-size: 0.85rem; margin-bottom: 0.3rem; color: #888;">REMAINING</div>
+                <div style="background: rgba(255,255,255,0.1); height: 10px; border-radius: 5px; overflow: hidden;">
+                    <div style="width: ${resource.amount}%; height: 100%; background: ${typeInfo.color}; transition: width 0.3s;"></div>
+                </div>
+                <div style="text-align: right; font-size: 0.75rem; color: #888; margin-top: 0.2rem;">${resource.amount} units</div>
+            </div>
+
+            <div style="font-size: 0.8rem; color: #aaa; margin-top: 1rem;">
+                Humanoids can mine this resource when nearby.
+            </div>
+
+            <div style="font-size: 0.7rem; color: #555; margin-top: 1rem; text-align: center;">
+                Position: (${resource.flatX?.toFixed(1)}, ${resource.flatZ?.toFixed(1)})
+            </div>
+        `;
+
+        document.body.appendChild(this.resourcePanel);
+        document.getElementById('resource-close-btn').onclick = () => this.deselectResource();
+    }
+
+    hideResourcePanel() {
+        if (this.resourcePanel) {
+            document.body.removeChild(this.resourcePanel);
+            this.resourcePanel = null;
+        }
+    }
+
+    // Cloud selection
+    selectCloud(cloudIndex) {
+        this.deselectOrganism();
+        this.deselectBuilding();
+        this.deselectResource();
+        this.deselectCloud();
+
+        if (!this.weatherSystem || !this.weatherSystem.clouds[cloudIndex]) return;
+
+        this.selectedCloud = cloudIndex;
+        const cloud = this.weatherSystem.clouds[cloudIndex];
+
+        // Add selection indicator (glowing outline)
+        const ringGeometry = new THREE.RingGeometry(5, 6, 32);
+        const ringMaterial = new THREE.MeshBasicMaterial({
+            color: 0xaaddff,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.6
+        });
+        this.cloudSelectionRing = new THREE.Mesh(ringGeometry, ringMaterial);
+        this.cloudSelectionRing.rotation.x = Math.PI / 2;
+        cloud.group.add(this.cloudSelectionRing);
+
+        this.showCloudPanel(cloudIndex);
+    }
+
+    deselectCloud() {
+        if (this.cloudSelectionRing) {
+            this.cloudSelectionRing.parent?.remove(this.cloudSelectionRing);
+            this.cloudSelectionRing = null;
+        }
+        this.selectedCloud = null;
+        this.hideCloudPanel();
+    }
+
+    showCloudPanel(cloudIndex) {
+        const cloud = this.weatherSystem?.clouds[cloudIndex];
+        if (!cloud) return;
+
+        this.hideCloudPanel();
+
+        this.cloudPanel = document.createElement('div');
+        this.cloudPanel.style.cssText = `
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(30, 40, 60, 0.95);
+            border: 2px solid rgba(170, 220, 255, 0.6);
+            border-radius: 12px;
+            padding: 1.5rem;
+            color: white;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            min-width: 260px;
+            z-index: 1000;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        `;
+
+        const weatherIcons = {
+            'clear': '\u2600',
+            'cloudy': '\u2601',
+            'rain': '\u{1F327}',
+            'storm': '\u26C8'
+        };
+
+        const weatherColors = {
+            'clear': '#fff8dc',
+            'cloudy': '#ccc',
+            'rain': '#6699ff',
+            'storm': '#9966ff'
+        };
+
+        const icon = weatherIcons[cloud.weatherState] || '\u2601';
+        const color = weatherColors[cloud.weatherState] || '#ccc';
+        const moisturePercent = Math.round(cloud.moisture * 100);
+        const intensityPercent = Math.round(cloud.weatherIntensity * 100);
+
+        this.cloudPanel.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                <div style="font-size: 1.3rem; color: ${color};">
+                    ${icon} Cloud #${cloudIndex + 1}
+                </div>
+                <button id="cloud-close-btn" style="background: none; border: none; color: #888; font-size: 1.5rem; cursor: pointer; padding: 0;">&times;</button>
+            </div>
+
+            <div style="background: rgba(255,255,255,0.1); border-radius: 8px; padding: 0.8rem; margin: 1rem 0;">
+                <div style="font-size: 1rem; color: ${color}; text-transform: capitalize; font-weight: 600;">
+                    ${cloud.weatherState}
+                </div>
+                ${cloud.isOverWater ? '<div style="font-size: 0.8rem; color: #66aaff; margin-top: 0.3rem;">\u{1F30A} Over Water - Absorbing moisture</div>' : '<div style="font-size: 0.8rem; color: #8b4513; margin-top: 0.3rem;">\u{1F33F} Over Land</div>'}
+            </div>
+
+            <div style="margin: 1rem 0;">
+                <div style="font-size: 0.85rem; margin-bottom: 0.3rem; color: #888;">MOISTURE</div>
+                <div style="background: rgba(255,255,255,0.1); height: 10px; border-radius: 5px; overflow: hidden;">
+                    <div style="width: ${moisturePercent}%; height: 100%; background: #4488ff; transition: width 0.3s;"></div>
+                </div>
+                <div style="text-align: right; font-size: 0.75rem; color: #888; margin-top: 0.2rem;">${moisturePercent}%</div>
+            </div>
+
+            <div style="margin: 1rem 0;">
+                <div style="font-size: 0.85rem; margin-bottom: 0.3rem; color: #888;">INTENSITY</div>
+                <div style="background: rgba(255,255,255,0.1); height: 10px; border-radius: 5px; overflow: hidden;">
+                    <div style="width: ${intensityPercent}%; height: 100%; background: ${color}; transition: width 0.3s;"></div>
+                </div>
+                <div style="text-align: right; font-size: 0.75rem; color: #888; margin-top: 0.2rem;">${intensityPercent}%</div>
+            </div>
+
+            ${cloud.canStorm ? '<div style="font-size: 0.8rem; color: #ff6; margin-top: 0.5rem;">\u26A1 Can produce lightning</div>' : ''}
+
+            <div style="font-size: 0.75rem; color: #666; margin-top: 1rem;">
+                Clouds absorb moisture over water and release it as rain over land.
+            </div>
+        `;
+
+        document.body.appendChild(this.cloudPanel);
+        document.getElementById('cloud-close-btn').onclick = () => this.deselectCloud();
+    }
+
+    hideCloudPanel() {
+        if (this.cloudPanel) {
+            document.body.removeChild(this.cloudPanel);
+            this.cloudPanel = null;
+        }
+    }
+
     showNeuralNetworkPanel(id) {
         // Get organism data
         const data = this.wasmModule.getOrganismData();
@@ -960,10 +1521,17 @@ export class Renderer {
             document.body.appendChild(this.neuralNetworkPanel);
         }
 
+        // Get plant-specific data if this is a plant
+        const isPlant = type === 0;
+        const plantInfo = isPlant ? this.plantData.get(id) : null;
+        const growthPercent = plantInfo ? Math.round((plantInfo.growth / plantInfo.maxGrowth) * 100) : 0;
+        const plantTypeNames = ['Grass', 'Tree', 'Bush', 'Flower', 'Crop'];
+        const plantTypeName = plantInfo ? plantTypeNames[plantInfo.plantType] || 'Plant' : 'Plant';
+
         // Build detailed stats HTML
         const statsHTML = `
             <div style="margin-bottom: 1rem; font-size: 1.3rem; color: #0F0; text-align: center;">
-                ${typeIcons[type]} ${typeNames[type]} #${id}
+                ${typeIcons[type]} ${isPlant ? plantTypeName : typeNames[type]} #${id}
             </div>
 
             <div style="margin: 1rem 0;">
@@ -974,22 +1542,45 @@ export class Renderer {
                 <div style="text-align: right; font-size: 0.75rem; color: #888; margin-top: 0.2rem;">${health.toFixed(0)}%</div>
             </div>
 
-            <div style="margin: 1rem 0;">
-                <div style="font-size: 0.85rem; margin-bottom: 0.3rem; color: #888;">ENERGY</div>
-                <div style="background: rgba(255,255,255,0.1); height: 10px; border-radius: 5px; overflow: hidden;">
-                    <div style="width: ${energy}%; height: 100%; background: ${energy > 70 ? '#0f0' : energy > 30 ? '#ff0' : '#f00'}; transition: width 0.3s;"></div>
+            ${isPlant ? `
+                <div style="margin: 1rem 0;">
+                    <div style="font-size: 0.85rem; margin-bottom: 0.3rem; color: #888;">GROWTH</div>
+                    <div style="background: rgba(255,255,255,0.1); height: 10px; border-radius: 5px; overflow: hidden;">
+                        <div style="width: ${growthPercent}%; height: 100%; background: #4a4; transition: width 0.3s;"></div>
+                    </div>
+                    <div style="text-align: right; font-size: 0.75rem; color: #888; margin-top: 0.2rem;">${growthPercent}%</div>
                 </div>
-                <div style="text-align: right; font-size: 0.75rem; color: #888; margin-top: 0.2rem;">${energy.toFixed(0)}%</div>
-            </div>
 
-            ${tribeId > 0 ? `
-                <div style="background: rgba(0,100,255,0.15); border: 1px solid rgba(0,200,255,0.3); border-radius: 6px; padding: 0.6rem; margin: 1rem 0;">
-                    <div style="color: #0af; font-weight: 600;">🏛️ Tribe Member</div>
-                    <div style="font-size: 0.85rem; color: #888; margin-top: 0.3rem;">Tribe ID: ${tribeId}</div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; margin: 1rem 0;">
+                    <div style="background: rgba(255,255,255,0.05); padding: 0.6rem; border-radius: 6px;">
+                        <div style="color: #888; font-size: 0.75rem;">AGE</div>
+                        <div style="font-size: 1.1rem; margin-top: 0.3rem;">${plantInfo ? plantInfo.age.toFixed(0) : 0}s</div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.05); padding: 0.6rem; border-radius: 6px;">
+                        <div style="color: #888; font-size: 0.75rem;">CAN SEED</div>
+                        <div style="font-size: 1.1rem; margin-top: 0.3rem;">${plantInfo && plantInfo.canSeed ? '✓ Yes' : '✗ No'}</div>
+                    </div>
                 </div>
-            ` : ''}
 
-            ${type !== 0 ? `
+                <div style="text-align: center; color: #6a6; padding: 1rem; font-size: 0.9rem;">
+                    🌱 Plants grow naturally and can spread seeds when mature.
+                </div>
+            ` : `
+                <div style="margin: 1rem 0;">
+                    <div style="font-size: 0.85rem; margin-bottom: 0.3rem; color: #888;">ENERGY</div>
+                    <div style="background: rgba(255,255,255,0.1); height: 10px; border-radius: 5px; overflow: hidden;">
+                        <div style="width: ${energy}%; height: 100%; background: ${energy > 70 ? '#0f0' : energy > 30 ? '#ff0' : '#f00'}; transition: width 0.3s;"></div>
+                    </div>
+                    <div style="text-align: right; font-size: 0.75rem; color: #888; margin-top: 0.2rem;">${energy.toFixed(0)}%</div>
+                </div>
+
+                ${tribeId > 0 && tribeId !== 0xFFFFFFFF ? `
+                    <div style="background: rgba(0,100,255,0.15); border: 1px solid rgba(0,200,255,0.3); border-radius: 6px; padding: 0.6rem; margin: 1rem 0;">
+                        <div style="color: #0af; font-weight: 600;">🏛️ Tribe Member</div>
+                        <div style="font-size: 0.85rem; color: #888; margin-top: 0.3rem;">Tribe ID: ${tribeId}</div>
+                    </div>
+                ` : ''}
+
                 <div style="background: rgba(100,0,255,0.2); border: 1px solid rgba(150,0,255,0.3); border-radius: 8px; padding: 1rem; margin: 1.5rem 0;">
                     <div style="color: #0F0; font-weight: 600; margin-bottom: 0.8rem; font-size: 1.1rem;">
                         🧠 Neural Network Live State
@@ -1005,7 +1596,7 @@ export class Renderer {
                         🧠 Neural network controlling all decisions autonomously
                     </div>
                 </div>
-            ` : '<div style="text-align: center; color: #888; padding: 2rem;">🌱 Plants do not have neural networks</div>'}
+            `}
         `;
 
         this.neuralNetworkPanel.innerHTML = statsHTML;
@@ -1288,7 +1879,7 @@ export class Renderer {
             // Herbivores/Carnivores: legs extend to local y=-1.0, world y=-1.25, need lift of 1.25
             // Humanoids: legs extend to local y=-0.95, world y=-1.2, need lift of ~1.2
             const objectHeights = {
-                0: 0,     // Plant - trunk/base at y=0, place directly on terrain
+                0: -0.2,  // Plant - slight push into ground to ensure grounding after scaling
                 1: 1.25,  // Herbivore - legs extend to world y=-1.25, lift so feet touch ground
                 2: 1.25,  // Carnivore - legs extend to world y=-1.25, lift so feet touch ground
                 3: 1.2    // Humanoid - legs extend to world y=-1.2, lift so feet touch ground
@@ -1408,6 +1999,9 @@ export class Renderer {
 
         // Update plant growth and seeding
         this.updatePlants(data, 1/60); // Assuming ~60fps
+
+        // Update fire system
+        this.updateFires(1/60);
 
         // Remove organisms that no longer exist
         for (const [id, mesh] of this.organisms) {
