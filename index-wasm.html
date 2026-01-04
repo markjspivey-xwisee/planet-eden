@@ -3,7 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Planet Eden - WASM Edition</title>
+    <title>Planet Eden - WASM Tribal Civilization Simulator</title>
+
+    <!-- Import map for Three.js module resolution -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.159.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.159.0/examples/jsm/"
+        }
+    }
+    </script>
+
     <style>
         * {
             margin: 0;
@@ -12,22 +23,24 @@
         }
 
         body {
-            font-family: 'Courier New', monospace;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             overflow: hidden;
             background: #000;
+            color: #fff;
         }
 
         canvas {
             display: block;
         }
 
+        /* Loading Screen */
         #loading {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: #000;
+            background: linear-gradient(135deg, #000000, #1a1a2e, #000000);
             color: #0F0;
             display: flex;
             justify-content: center;
@@ -38,17 +51,19 @@
         }
 
         #loading.hidden {
-            display: none;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s;
         }
 
         .loading-spinner {
             border: 4px solid rgba(0, 255, 0, 0.1);
             border-top: 4px solid #0F0;
             border-radius: 50%;
-            width: 60px;
-            height: 60px;
+            width: 80px;
+            height: 80px;
             animation: spin 1s linear infinite;
-            margin-bottom: 20px;
+            margin-bottom: 30px;
         }
 
         @keyframes spin {
@@ -56,80 +71,475 @@
             100% { transform: rotate(360deg); }
         }
 
+        /* Title Splash */
         .title {
             position: fixed;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            font-size: 48px;
+            font-size: 64px;
             font-weight: bold;
-            color: #0F0;
-            text-shadow: 0 0 20px #0F0;
+            background: linear-gradient(45deg, #0F0, #0ff, #0F0);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: 0 0 40px rgba(0, 255, 0, 0.8);
             pointer-events: none;
             z-index: 999;
-            animation: fadeOut 3s forwards;
+            animation: fadeOut 4s forwards;
         }
 
         @keyframes fadeOut {
-            0%, 80% { opacity: 1; }
+            0%, 70% { opacity: 1; }
             100% { opacity: 0; }
         }
 
-        .info-panel {
+        /* HUD Panels */
+        .hud-panel {
             position: fixed;
-            bottom: 10px;
-            left: 10px;
-            background: rgba(0, 0, 0, 0.7);
-            color: white;
-            padding: 10px;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 255, 0, 0.3);
+            border-radius: 12px;
+            padding: 15px;
+            color: #fff;
+            font-size: 13px;
+            z-index: 1000;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.2);
+        }
+
+        .hud-panel h3 {
+            margin: 0 0 12px 0;
+            color: #0F0;
+            font-size: 16px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-bottom: 2px solid rgba(0, 255, 0, 0.3);
+            padding-bottom: 8px;
+        }
+
+        /* Tribe Panel (Left) */
+        #tribe-panel {
+            top: 20px;
+            left: 20px;
+            width: 380px;
+            max-height: 650px;
+            overflow-y: auto;
+        }
+
+        .tribe-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-left: 4px solid;
+            padding: 12px;
+            margin: 10px 0;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .tribe-card:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateX(5px);
+        }
+
+        .tribe-name {
+            font-size: 15px;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .tribe-stat {
+            display: flex;
+            justify-content: space-between;
+            margin: 4px 0;
+            font-size: 11px;
+        }
+
+        .resource-bar {
+            background: rgba(255, 255, 255, 0.1);
+            height: 6px;
+            border-radius: 3px;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+
+        .resource-fill {
+            height: 100%;
+            transition: width 0.3s;
+        }
+
+        /* Stats Panel (Top Right) */
+        #stats-panel {
+            top: 20px;
+            right: 20px;
+            width: 280px;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+        }
+
+        .stat-value {
+            color: #0F0;
+            font-weight: bold;
+        }
+
+        /* God Powers Panel (Right) */
+        #god-powers-panel {
+            top: 320px;
+            right: 20px;
+            width: 280px;
+        }
+
+        .god-power-btn {
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0;
+            background: linear-gradient(135deg, rgba(0, 100, 255, 0.3), rgba(0, 50, 200, 0.3));
+            border: 1px solid rgba(0, 150, 255, 0.5);
             border-radius: 8px;
+            color: #fff;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .god-power-btn:hover {
+            background: linear-gradient(135deg, rgba(0, 150, 255, 0.5), rgba(0, 100, 255, 0.5));
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(0, 150, 255, 0.5);
+        }
+
+        .god-power-btn:active {
+            transform: scale(0.95);
+        }
+
+        .god-power-icon {
+            font-size: 20px;
+            margin-right: 10px;
+        }
+
+        /* Population Chart (Bottom Right) */
+        #chart-panel {
+            bottom: 20px;
+            right: 20px;
+            width: 450px;
+            height: 250px;
+        }
+
+        #population-chart {
+            width: 100%;
+            height: 180px;
+        }
+
+        /* Controls Panel (Bottom Left) */
+        #controls-panel {
+            bottom: 20px;
+            left: 20px;
+            width: 380px;
+        }
+
+        .control-group {
+            margin: 15px 0;
+        }
+
+        .control-label {
+            display: block;
+            margin-bottom: 8px;
+            color: #0F0;
             font-size: 12px;
+            text-transform: uppercase;
+        }
+
+        .control-btn {
+            padding: 10px 15px;
+            margin: 4px;
+            background: rgba(0, 255, 0, 0.1);
+            border: 1px solid rgba(0, 255, 0, 0.3);
+            border-radius: 6px;
+            color: #0F0;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .control-btn:hover {
+            background: rgba(0, 255, 0, 0.2);
+            border-color: #0F0;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.3);
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        input[type="range"] {
+            flex: 1;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            width: 16px;
+            height: 16px;
+            background: #0F0;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+
+        /* FPS Counter */
+        #fps-counter {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 24px;
+            color: #0F0;
+            font-weight: bold;
+            border: 2px solid #0F0;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
             z-index: 1000;
         }
 
-        .info-panel h4 {
-            margin: 0 0 5px 0;
-            color: #0F0;
+        /* Message Floating Icons */
+        .message-icon {
+            position: fixed;
+            font-size: 32px;
+            z-index: 900;
+            animation: floatMessage 8s forwards;
+            pointer-events: none;
+            text-shadow: 0 0 10px rgba(0, 0, 0, 0.8);
         }
 
-        .info-panel p {
-            margin: 2px 0;
+        @keyframes floatMessage {
+            0% {
+                transform: translateY(0) scale(1);
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(-100px) scale(1.5);
+                opacity: 0;
+            }
+        }
+
+        /* Achievements Toast */
+        #achievement-toast {
+            position: fixed;
+            bottom: 300px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #FFD700, #FFA500);
+            color: #000;
+            padding: 20px 30px;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: bold;
+            box-shadow: 0 0 30px rgba(255, 215, 0, 0.8);
+            z-index: 2000;
+            display: none;
+            animation: slideIn 0.5s;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(-50%) translateY(100px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(-50%) translateY(0);
+                opacity: 1;
+            }
+        }
+
+        /* Scrollbar Styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0, 255, 0, 0.3);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 255, 0, 0.5);
+        }
+
+        /* Pause Overlay */
+        #pause-overlay {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 72px;
+            color: rgba(255, 255, 255, 0.8);
+            text-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
+            pointer-events: none;
+            z-index: 1500;
+            display: none;
         }
     </style>
 </head>
 <body>
-    <!-- Loading screen -->
+    <!-- Loading Screen -->
     <div id="loading">
         <div class="loading-spinner"></div>
         <div>Loading Planet Eden WASM...</div>
         <div style="font-size: 14px; margin-top: 10px; color: #888;">
-            Compiling WebAssembly module
+            Initializing neural networks and tribal civilizations
+        </div>
+        <div style="font-size: 12px; margin-top: 20px; color: #0F0;">
+            686 KB WASM | 16 MB Memory | Neural Networks
         </div>
     </div>
 
-    <!-- Title splash -->
+    <!-- Title Splash -->
     <div class="title">PLANET EDEN: WASM</div>
 
-    <!-- Info panel -->
-    <div class="info-panel">
-        <h4>Planet Eden - WASM Edition</h4>
-        <p>High-performance evolution simulation</p>
-        <p style="margin-top: 8px; font-size: 10px; color: #888;">
-            Powered by Zig + WebAssembly<br>
-            Build: v1.0.0 | 709 KB WASM
-        </p>
+    <!-- Pause Overlay -->
+    <div id="pause-overlay">PAUSED</div>
+
+    <!-- Achievement Toast -->
+    <div id="achievement-toast"></div>
+
+    <!-- FPS Counter -->
+    <div id="fps-counter">-- FPS</div>
+
+    <!-- Time Display -->
+    <div id="time-display" style="
+        position: fixed;
+        top: 60px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0, 0, 0, 0.8);
+        padding: 8px 18px;
+        border-radius: 6px;
+        font-size: 16px;
+        color: #ffd700;
+        border: 1px solid rgba(255, 215, 0, 0.3);
+        box-shadow: 0 0 15px rgba(255, 215, 0, 0.2);
+        z-index: 1000;
+    ">Day 1 - 10:00</div>
+
+    <!-- Weather Display -->
+    <div id="weather-display" style="
+        position: fixed;
+        top: 100px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0, 0, 0, 0.7);
+        padding: 6px 14px;
+        border-radius: 6px;
+        font-size: 14px;
+        color: #88ccff;
+        border: 1px solid rgba(136, 204, 255, 0.3);
+        z-index: 1000;
+    ">Clear</div>
+
+    <!-- Tribe Panel -->
+    <div id="tribe-panel" class="hud-panel">
+        <h3>🏛️ Tribal Civilizations</h3>
+        <div id="tribe-list"></div>
     </div>
 
-    <script type="module">
-        // Remove loading screen when WASM is loaded
-        window.addEventListener('load', () => {
-            setTimeout(() => {
-                document.getElementById('loading').classList.add('hidden');
-            }, 1000);
-        });
+    <!-- Stats Panel -->
+    <div id="stats-panel" class="hud-panel">
+        <h3>📊 Simulation Stats</h3>
+        <div id="stats-content"></div>
+    </div>
 
-        // Import and run main application
-        import './js/wasm-main.js';
-    </script>
+    <!-- God Powers Panel -->
+    <div id="god-powers-panel" class="hud-panel">
+        <h3>⚡ God Powers</h3>
+        <button class="god-power-btn" id="btn-spawn-tribe">
+            <span><span class="god-power-icon">👥</span>Spawn New Tribe</span>
+            <span style="font-size: 11px;">F1</span>
+        </button>
+        <button class="god-power-btn" id="btn-mass-spawn">
+            <span><span class="god-power-icon">🌱</span>Mass Spawn (100)</span>
+            <span style="font-size: 11px;">F2</span>
+        </button>
+        <button class="god-power-btn" id="btn-gift-resources">
+            <span><span class="god-power-icon">💎</span>Gift Resources</span>
+            <span style="font-size: 11px;">F3</span>
+        </button>
+        <button class="god-power-btn" id="btn-trigger-war">
+            <span><span class="god-power-icon">⚔️</span>Trigger War</span>
+            <span style="font-size: 11px;">F4</span>
+        </button>
+        <button class="god-power-btn" id="btn-plague">
+            <span><span class="god-power-icon">☠️</span>Plague</span>
+            <span style="font-size: 11px;">F5</span>
+        </button>
+        <button class="god-power-btn" id="btn-blessing">
+            <span><span class="god-power-icon">✨</span>Divine Blessing</span>
+            <span style="font-size: 11px;">F6</span>
+        </button>
+    </div>
+
+    <!-- Population Chart -->
+    <div id="chart-panel" class="hud-panel">
+        <h3>📈 Population History</h3>
+        <canvas id="population-chart"></canvas>
+    </div>
+
+    <!-- Controls Panel -->
+    <div id="controls-panel" class="hud-panel">
+        <h3>🎮 Controls</h3>
+
+        <div class="control-group">
+            <label class="control-label">Spawn Organisms</label>
+            <button class="control-btn" id="btn-spawn-plant">🌱 Plant</button>
+            <button class="control-btn" id="btn-spawn-herbivore">🦌 Herbivore</button>
+            <button class="control-btn" id="btn-spawn-carnivore">🦁 Carnivore</button>
+            <button class="control-btn" id="btn-spawn-humanoid">🧍 Humanoid</button>
+        </div>
+
+        <div class="control-group">
+            <label class="control-label">Time Scale</label>
+            <div class="slider-container">
+                <span>0.1x</span>
+                <input type="range" id="time-scale-slider" min="0.1" max="5" step="0.1" value="1">
+                <span id="time-scale-value">1.0x</span>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label class="control-label">Camera Controls</label>
+            <div style="font-size: 11px; line-height: 1.6; color: #888;">
+                <div>SPACE - Play/Pause</div>
+                <div>← → - Rotate Camera</div>
+                <div>↑ ↓ - Zoom In/Out</div>
+                <div>R - Reset Camera</div>
+                <div>+ - - Adjust Speed</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart.js Library -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+
+    <!-- Main Application -->
+    <script type="module" src="./js/wasm-main.js"></script>
 </body>
 </html>

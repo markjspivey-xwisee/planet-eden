@@ -41,6 +41,14 @@ pub const Vec3 = struct {
         };
     }
 
+    pub inline fn div(self: Vec3, scalar: f32) Vec3 {
+        return .{
+            .x = self.x / scalar,
+            .y = self.y / scalar,
+            .z = self.z / scalar,
+        };
+    }
+
     pub inline fn dot(self: Vec3, other: Vec3) f32 {
         return self.x * other.x + self.y * other.y + self.z * other.z;
     }

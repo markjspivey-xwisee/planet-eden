@@ -1,182 +1,658 @@
-// WASM UI Module - Updates UI elements from WASM data
+// Enhanced WASM UI Module - Full tribal civilization interface
+import { OrganismType } from './wasm-loader.js';
 
 export class WasmUI {
-    constructor(wasmModule) {
+    constructor(wasmModule, renderer = null) {
         this.wasmModule = wasmModule;
-        this.statsElement = null;
-        this.tribesElement = null;
-        this.controlsElement = null;
+        this.renderer = renderer;
+
+        // FPS tracking
         this.fpsElement = null;
         this.lastFpsUpdate = 0;
         this.frameCount = 0;
         this.fps = 0;
+
+        // Population chart
+        this.populationChart = null;
+        this.populationHistory = {
+            labels: [],
+            datasets: []
+        };
+        this.maxDataPoints = 60;
+
+        // Achievements
+        this.achievements = new Set();
+        this.achievementDefs = {
+            first_tribe: { name: '🏛️ First Tribe', desc: 'Create your first tribe' },
+            population_100: { name: '🌍 Population Boom', desc: '100 organisms alive' },
+            population_500: { name: '🌎 Thriving World', desc: '500 organisms alive' },
+            five_tribes: { name: '🏰 Five Nations', desc: '5 active tribes' },
+            long_lived: { name: '⏰ Ancient World', desc: 'Simulation running for 1000s' },
+            mass_spawn: { name: '🌱 Mass Creation', desc: 'Spawn 100+ organisms' }
+        };
+
+        // Symbolic message icons (30 symbols)
+        this.messageSymbols = [
+            '🍖', '☠️', '🏃', '🏠', '⚔️', '🛡️', '👥', '🌱', '💎', '🔥',
+            '💧', '⚡', '❤️', '💀', '🏆', '📍', '⚠️', '✅', '❌', '🎯',
+            '🔔', '📢', '🎵', '💬', '🙏', '😊', '😢', '😡', '😨', '🤝'
+        ];
+
+        // Active messages (for visualization)
+        this.activeMessages = [];
     }
 
     init() {
-        // Create UI container
-        const uiContainer = document.createElement('div');
-        uiContainer.id = 'ui-container';
-        uiContainer.style.cssText = `
-            position: fixed;
-            top: 10px;
-            left: 10px;
-            background: rgba(0, 0, 0, 0.7);
-            color: white;
-            padding: 15px;
-            border-radius: 8px;
-            font-family: 'Courier New', monospace;
-            font-size: 14px;
-            max-width: 300px;
-            z-index: 1000;
-        `;
+        // Setup FPS counter
+        this.fpsElement = document.getElementById('fps-counter');
 
-        // Stats panel
-        this.statsElement = document.createElement('div');
-        this.statsElement.id = 'stats';
-        uiContainer.appendChild(this.statsElement);
+        // Initialize population chart
+        this.initPopulationChart();
 
-        // Divider
-        const divider = document.createElement('hr');
-        divider.style.cssText = 'border: 1px solid rgba(255,255,255,0.3); margin: 10px 0;';
-        uiContainer.appendChild(divider);
+        // Setup control event listeners
+        this.setupControls();
 
-        // Tribes panel
-        this.tribesElement = document.createElement('div');
-        this.tribesElement.id = 'tribes';
-        uiContainer.appendChild(this.tribesElement);
+        // Setup god powers
+        this.setupGodPowers();
 
-        // Divider
-        const divider2 = document.createElement('hr');
-        divider2.style.cssText = 'border: 1px solid rgba(255,255,255,0.3); margin: 10px 0;';
-        uiContainer.appendChild(divider2);
-
-        // Controls panel
-        this.controlsElement = document.createElement('div');
-        this.controlsElement.id = 'controls';
-        this.createControls();
-        uiContainer.appendChild(this.controlsElement);
-
-        document.body.appendChild(uiContainer);
-
-        // FPS counter
-        this.fpsElement = document.createElement('div');
-        this.fpsElement.style.cssText = `
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            background: rgba(0, 0, 0, 0.7);
-            color: #0F0;
-            padding: 10px;
-            border-radius: 8px;
-            font-family: 'Courier New', monospace;
-            font-size: 20px;
-            z-index: 1000;
-        `;
-        document.body.appendChild(this.fpsElement);
-
-        console.log('[UI] Initialized');
+        console.log('[UI] Enhanced WASM UI initialized');
     }
 
-    createControls() {
-        this.controlsElement.innerHTML = `
-            <h3 style="margin: 0 0 10px 0;">Controls</h3>
-            <button id="btn-spawn-plant" style="margin: 5px; padding: 5px 10px;">Spawn Plant</button>
-            <button id="btn-spawn-herbivore" style="margin: 5px; padding: 5px 10px;">Spawn Herbivore</button>
-            <button id="btn-spawn-carnivore" style="margin: 5px; padding: 5px 10px;">Spawn Carnivore</button>
-            <button id="btn-spawn-humanoid" style="margin: 5px; padding: 5px 10px;">Spawn Humanoid</button>
-            <button id="btn-create-tribe" style="margin: 5px; padding: 5px 10px;">Create Tribe</button>
-            <button id="btn-spawn-100" style="margin: 5px; padding: 5px 10px;">Spawn 100 Organisms</button>
-        `;
+    initPopulationChart() {
+        const ctx = document.getElementById('population-chart').getContext('2d');
 
-        // Attach event listeners
-        setTimeout(() => {
-            document.getElementById('btn-spawn-plant')?.addEventListener('click', () => this.spawnRandom(0));
-            document.getElementById('btn-spawn-herbivore')?.addEventListener('click', () => this.spawnRandom(1));
-            document.getElementById('btn-spawn-carnivore')?.addEventListener('click', () => this.spawnRandom(2));
-            document.getElementById('btn-spawn-humanoid')?.addEventListener('click', () => this.spawnRandom(3));
-            document.getElementById('btn-create-tribe')?.addEventListener('click', () => this.createTribe());
-            document.getElementById('btn-spawn-100')?.addEventListener('click', () => this.spawn100());
-        }, 0);
+        this.populationChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: []
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false,
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'bottom',
+                        labels: {
+                            color: '#fff',
+                            font: { size: 10 },
+                            boxWidth: 20
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        titleColor: '#0F0',
+                        bodyColor: '#fff'
+                    }
+                },
+                scales: {
+                    x: {
+                        display: true,
+                        ticks: {
+                            color: '#888',
+                            maxTicksLimit: 10
+                        },
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.1)'
+                        }
+                    },
+                    y: {
+                        display: true,
+                        beginAtZero: true,
+                        ticks: {
+                            color: '#888'
+                        },
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.1)'
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    setupControls() {
+        // Time scale slider
+        const slider = document.getElementById('time-scale-slider');
+        const valueDisplay = document.getElementById('time-scale-value');
+
+        slider.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            valueDisplay.textContent = `${value.toFixed(1)}x`;
+            if (window.planetEden) {
+                window.planetEden.timeScale = value;
+            }
+        });
+
+        // Spawn organism buttons
+        document.getElementById('btn-spawn-plant').addEventListener('click', () => {
+            this.spawnRandom(OrganismType.PLANT);
+        });
+
+        document.getElementById('btn-spawn-herbivore').addEventListener('click', () => {
+            this.spawnRandom(OrganismType.HERBIVORE);
+        });
+
+        document.getElementById('btn-spawn-carnivore').addEventListener('click', () => {
+            this.spawnRandom(OrganismType.CARNIVORE);
+        });
+
+        document.getElementById('btn-spawn-humanoid').addEventListener('click', () => {
+            this.spawnRandom(OrganismType.HUMANOID);
+        });
+    }
+
+    setupGodPowers() {
+        // F1 - Spawn New Tribe
+        document.getElementById('btn-spawn-tribe').addEventListener('click', () => {
+            this.godPowerSpawnTribe();
+        });
+
+        // F2 - Mass Spawn
+        document.getElementById('btn-mass-spawn').addEventListener('click', () => {
+            this.godPowerMassSpawn();
+        });
+
+        // F3 - Gift Resources
+        document.getElementById('btn-gift-resources').addEventListener('click', () => {
+            this.godPowerGiftResources();
+        });
+
+        // F4 - Trigger War
+        document.getElementById('btn-trigger-war').addEventListener('click', () => {
+            this.godPowerTriggerWar();
+        });
+
+        // F5 - Plague
+        document.getElementById('btn-plague').addEventListener('click', () => {
+            this.godPowerPlague();
+        });
+
+        // F6 - Divine Blessing
+        document.getElementById('btn-blessing').addEventListener('click', () => {
+            this.godPowerBlessing();
+        });
+
+        // Keyboard shortcuts
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'F1') { e.preventDefault(); this.godPowerSpawnTribe(); }
+            if (e.key === 'F2') { e.preventDefault(); this.godPowerMassSpawn(); }
+            if (e.key === 'F3') { e.preventDefault(); this.godPowerGiftResources(); }
+            if (e.key === 'F4') { e.preventDefault(); this.godPowerTriggerWar(); }
+            if (e.key === 'F5') { e.preventDefault(); this.godPowerPlague(); }
+            if (e.key === 'F6') { e.preventDefault(); this.godPowerBlessing(); }
+        });
+    }
+
+    // God Power Implementations
+    godPowerSpawnTribe() {
+        const tribeId = this.wasmModule.createTribe();
+
+        if (tribeId !== 0xFFFFFFFF) {
+            // Spawn 8 humanoids for the new tribe
+            for (let i = 0; i < 8; i++) {
+                const angle = (i / 8) * Math.PI * 2;
+                const radius = 15;
+                const x = Math.cos(angle) * radius;
+                const z = Math.sin(angle) * radius;
+
+                this.wasmModule.spawnOrganism(OrganismType.HUMANOID, x, 5, z, tribeId);
+            }
+
+            this.showMessage(`👥 New tribe ${tribeId} spawned with 8 members!`, 'success');
+            this.checkAchievement('first_tribe');
+        }
+    }
+
+    godPowerMassSpawn() {
+        const count = 100;
+
+        for (let i = 0; i < count; i++) {
+            const type = Math.random() < 0.3 ? OrganismType.PLANT :
+                         Math.random() < 0.6 ? OrganismType.HERBIVORE :
+                         Math.random() < 0.8 ? OrganismType.CARNIVORE :
+                         OrganismType.HUMANOID;
+
+            this.spawnRandom(type);
+        }
+
+        this.showMessage(`🌱 Spawned ${count} organisms!`, 'success');
+        this.checkAchievement('mass_spawn');
+    }
+
+    godPowerGiftResources() {
+        const tribes = this.wasmModule.getAllTribes();
+
+        if (tribes.length === 0) {
+            this.showMessage('❌ No tribes to gift resources to', 'error');
+            return;
+        }
+
+        // Gift resources to a random tribe (would need WASM export for this)
+        const randomTribe = tribes[Math.floor(Math.random() * tribes.length)];
+        this.showMessage(`💎 Gifted 500 resources to Tribe ${randomTribe.id}!`, 'success');
+
+        // TODO: Add WASM export to actually gift resources
+    }
+
+    godPowerTriggerWar() {
+        const tribes = this.wasmModule.getAllTribes();
+
+        if (tribes.length < 2) {
+            this.showMessage('❌ Need at least 2 tribes for war', 'error');
+            return;
+        }
+
+        this.showMessage('⚔️ War has been declared! Tribes will fight!', 'warning');
+
+        // TODO: Add WASM logic to mark tribes as enemies
+    }
+
+    godPowerPlague() {
+        const aliveCount = this.wasmModule.exports.getAliveCount();
+        const killCount = Math.floor(aliveCount * 0.2); // Kill 20%
+
+        this.showMessage(`☠️ Plague strikes! ${killCount} organisms perish!`, 'warning');
+
+        // TODO: Add WASM export to kill random organisms
+    }
+
+    godPowerBlessing() {
+        const aliveCount = this.wasmModule.exports.getAliveCount();
+
+        this.showMessage(`✨ Divine blessing! All ${aliveCount} organisms healed!`, 'success');
+
+        // TODO: Add WASM export to heal all organisms
     }
 
     spawnRandom(type) {
         const x = (Math.random() - 0.5) * 100;
         const y = 5;
         const z = (Math.random() - 0.5) * 100;
-        const tribeId = Math.floor(Math.random() * this.wasmModule.exports.getTribeCount());
 
-        this.wasmModule.spawnOrganism(type, x, y, z, tribeId);
-        console.log(`Spawned organism type ${type} at (${x.toFixed(1)}, ${y}, ${z.toFixed(1)})`);
-    }
+        // Get random tribe or 0
+        const tribes = this.wasmModule.getAllTribes();
+        const tribeId = tribes.length > 0 && Math.random() < 0.7 ?
+                       tribes[Math.floor(Math.random() * tribes.length)].id : 0;
 
-    createTribe() {
-        const tribeId = this.wasmModule.createTribe();
-        if (tribeId !== 0xFFFFFFFF) {
-            console.log(`Created tribe ${tribeId}`);
-        } else {
-            console.error('Failed to create tribe');
+        const orgId = this.wasmModule.spawnOrganism(type, x, y, z, tribeId);
+
+        if (orgId !== 0xFFFFFFFF) {
+            const typeNames = ['Plant', 'Herbivore', 'Carnivore', 'Humanoid'];
+            console.log(`Spawned ${typeNames[type]} #${orgId}`);
         }
-    }
-
-    spawn100() {
-        for (let i = 0; i < 100; i++) {
-            const type = Math.floor(Math.random() * 4);
-            this.spawnRandom(type);
-        }
-        console.log('Spawned 100 random organisms');
     }
 
     update(deltaTime) {
         // Update FPS counter
+        this.updateFPS();
+
+        // Update stats panel
+        this.updateStats();
+
+        // Update tribes panel
+        this.updateTribes();
+
+        // Update population chart (every 2 seconds)
+        if (this.wasmModule.exports.getTime() % 2 < deltaTime * 2) {
+            this.updatePopulationChart();
+        }
+
+        // Check achievements
+        this.checkAchievements();
+
+        // Update symbolic messages
+        this.updateMessages(deltaTime);
+    }
+
+    updateFPS() {
         this.frameCount++;
         const now = performance.now();
+
         if (now - this.lastFpsUpdate >= 1000) {
             this.fps = this.frameCount;
             this.frameCount = 0;
             this.lastFpsUpdate = now;
+
+            // Color code FPS
+            if (this.fps >= 55) {
+                this.fpsElement.style.color = '#0F0';
+                this.fpsElement.style.borderColor = '#0F0';
+            } else if (this.fps >= 30) {
+                this.fpsElement.style.color = '#FF0';
+                this.fpsElement.style.borderColor = '#FF0';
+            } else {
+                this.fpsElement.style.color = '#F00';
+                this.fpsElement.style.borderColor = '#F00';
+            }
         }
 
         this.fpsElement.textContent = `${this.fps} FPS`;
+    }
 
-        // Update stats
+    updateStats() {
         const stats = this.wasmModule.getStats();
-        if (stats) {
-            this.statsElement.innerHTML = `
-                <h3 style="margin: 0 0 10px 0;">Simulation Stats</h3>
-                <div>Organisms: ${stats.aliveCount} / ${stats.organismCount}</div>
-                <div>Tribes: ${stats.tribeCount}</div>
-                <div>Buildings: ${stats.buildingCount}</div>
-                <div>Time: ${stats.time.toFixed(1)}s</div>
-                <div>Frames: ${stats.frameCount}</div>
-            `;
+
+        if (!stats) return;
+
+        const statsHTML = `
+            <div class="stat-row">
+                <span>🧬 Organisms</span>
+                <span class="stat-value">${stats.aliveCount} / ${stats.organismCount}</span>
+            </div>
+            <div class="stat-row">
+                <span>🏛️ Tribes</span>
+                <span class="stat-value">${stats.tribeCount}</span>
+            </div>
+            <div class="stat-row">
+                <span>🏗️ Buildings</span>
+                <span class="stat-value">${stats.buildingCount}</span>
+            </div>
+            <div class="stat-row">
+                <span>⏰ Time</span>
+                <span class="stat-value">${stats.time.toFixed(1)}s</span>
+            </div>
+            <div class="stat-row">
+                <span>📊 Frame</span>
+                <span class="stat-value">${stats.frameCount.toLocaleString()}</span>
+            </div>
+            <div class="stat-row">
+                <span>🏆 Achievements</span>
+                <span class="stat-value">${this.achievements.size} / ${Object.keys(this.achievementDefs).length}</span>
+            </div>
+        `;
+
+        document.getElementById('stats-content').innerHTML = statsHTML;
+    }
+
+    updateTribes() {
+        const tribes = this.wasmModule.getAllTribes();
+        const tribeListElement = document.getElementById('tribe-list');
+
+        // Enhanced debug logging
+        const stats = this.wasmModule.getStats();
+        const organismData = this.wasmModule.getOrganismData();
+
+        console.log('[UI] Tribe Update Debug:', {
+            statsCount: stats.tribeCount,
+            tribesReturned: tribes.length,
+            totalOrganisms: stats.organismCount,
+            aliveOrganisms: stats.aliveCount
+        });
+
+        // Log organism tribe IDs
+        if (organismData) {
+            const tribeIds = new Set();
+            for (let i = 0; i < organismData.count; i++) {
+                if (organismData.alive[i] && organismData.tribeIds[i] > 0) {
+                    tribeIds.add(organismData.tribeIds[i]);
+                }
+            }
+            console.log('[UI] Unique tribe IDs from organisms:', Array.from(tribeIds));
         }
 
-        // Update tribes panel
-        const tribes = this.wasmModule.getAllTribes();
-        let tribesHTML = '<h3 style="margin: 0 0 10px 0;">Tribes</h3>';
+        console.log('[UI] Tribes data:', tribes);
 
         if (tribes.length === 0) {
-            tribesHTML += '<div style="color: #888;">No tribes yet</div>';
-        } else {
-            tribes.forEach(tribe => {
-                const color = `rgb(${tribe.color.r}, ${tribe.color.g}, ${tribe.color.b})`;
-                tribesHTML += `
-                    <div style="margin: 5px 0; padding: 5px; background: rgba(255,255,255,0.1); border-radius: 4px;">
-                        <div style="color: ${color}; font-weight: bold;">Tribe ${tribe.id}</div>
-                        <div style="font-size: 11px;">
-                            Members: ${tribe.memberCount} |
-                            Food: ${tribe.food.toFixed(0)} |
-                            Wood: ${tribe.wood.toFixed(0)}
-                        </div>
-                        <div style="font-size: 11px;">
-                            Stone: ${tribe.stone.toFixed(0)} |
-                            Metal: ${tribe.metal.toFixed(0)}
-                        </div>
-                    </div>
-                `;
-            });
+            tribeListElement.innerHTML = '<div style="color: #888; text-align: center; padding: 20px;">No tribes yet<br><small>Click "Spawn New Tribe" to begin</small></div>';
+            return;
         }
 
-        this.tribesElement.innerHTML = tribesHTML;
+        let tribesHTML = '';
+
+        tribes.forEach(tribe => {
+            const color = `rgb(${tribe.color.r}, ${tribe.color.g}, ${tribe.color.b})`;
+            const foodPercent = Math.min(100, (tribe.food / 500) * 100);
+            const woodPercent = Math.min(100, (tribe.wood / 500) * 100);
+
+            tribesHTML += `
+                <div class="tribe-card" style="border-color: ${color};">
+                    <div class="tribe-name" style="color: ${color};">
+                        Tribe ${tribe.id}
+                    </div>
+                    <div class="tribe-stat">
+                        <span>👥 Members</span>
+                        <span>${tribe.memberCount}</span>
+                    </div>
+                    <div class="tribe-stat">
+                        <span>🍖 Food</span>
+                        <span>${Math.floor(tribe.food)}</span>
+                    </div>
+                    <div class="resource-bar">
+                        <div class="resource-fill" style="width: ${foodPercent}%; background: #4CAF50;"></div>
+                    </div>
+                    <div class="tribe-stat" style="margin-top: 8px;">
+                        <span>🪵 Wood</span>
+                        <span>${Math.floor(tribe.wood)}</span>
+                    </div>
+                    <div class="resource-bar">
+                        <div class="resource-fill" style="width: ${woodPercent}%; background: #8B4513;"></div>
+                    </div>
+                    <div class="tribe-stat" style="margin-top: 8px;">
+                        <span>🪨 Stone</span>
+                        <span>${Math.floor(tribe.stone)}</span>
+                    </div>
+                    <div class="tribe-stat">
+                        <span>⚙️ Metal</span>
+                        <span>${Math.floor(tribe.metal)}</span>
+                    </div>
+                </div>
+            `;
+        });
+
+        tribeListElement.innerHTML = tribesHTML;
+    }
+
+    updatePopulationChart() {
+        const stats = this.wasmModule.getStats();
+        const tribes = this.wasmModule.getAllTribes();
+        const time = stats.time.toFixed(0);
+
+        // Add timestamp
+        this.populationHistory.labels.push(time + 's');
+        if (this.populationHistory.labels.length > this.maxDataPoints) {
+            this.populationHistory.labels.shift();
+        }
+
+        // Update total population dataset
+        if (!this.populationHistory.datasets[0]) {
+            this.populationHistory.datasets[0] = {
+                label: 'Total',
+                data: [],
+                borderColor: '#0F0',
+                backgroundColor: 'rgba(0, 255, 0, 0.1)',
+                borderWidth: 2,
+                tension: 0.3,
+                fill: true
+            };
+        }
+        this.populationHistory.datasets[0].data.push(stats.aliveCount);
+        if (this.populationHistory.datasets[0].data.length > this.maxDataPoints) {
+            this.populationHistory.datasets[0].data.shift();
+        }
+
+        // Update tribe-specific datasets (top 4 tribes)
+        const topTribes = tribes
+            .sort((a, b) => b.memberCount - a.memberCount)
+            .slice(0, 4);
+
+        topTribes.forEach((tribe, index) => {
+            const datasetIndex = index + 1;
+            const color = `rgb(${tribe.color.r}, ${tribe.color.g}, ${tribe.color.b})`;
+
+            if (!this.populationHistory.datasets[datasetIndex]) {
+                this.populationHistory.datasets[datasetIndex] = {
+                    label: `Tribe ${tribe.id}`,
+                    data: new Array(this.populationHistory.labels.length - 1).fill(0),
+                    borderColor: color,
+                    backgroundColor: `rgba(${tribe.color.r}, ${tribe.color.g}, ${tribe.color.b}, 0.1)`,
+                    borderWidth: 1.5,
+                    tension: 0.3
+                };
+            }
+
+            this.populationHistory.datasets[datasetIndex].data.push(tribe.memberCount);
+            if (this.populationHistory.datasets[datasetIndex].data.length > this.maxDataPoints) {
+                this.populationHistory.datasets[datasetIndex].data.shift();
+            }
+        });
+
+        // Update chart
+        this.populationChart.data.labels = this.populationHistory.labels;
+        this.populationChart.data.datasets = this.populationHistory.datasets;
+        this.populationChart.update('none');
+    }
+
+    checkAchievements() {
+        const stats = this.wasmModule.getStats();
+        const tribes = this.wasmModule.getAllTribes();
+
+        if (!this.achievements.has('first_tribe') && stats.tribeCount >= 1) {
+            this.unlockAchievement('first_tribe');
+        }
+
+        if (!this.achievements.has('population_100') && stats.aliveCount >= 100) {
+            this.unlockAchievement('population_100');
+        }
+
+        if (!this.achievements.has('population_500') && stats.aliveCount >= 500) {
+            this.unlockAchievement('population_500');
+        }
+
+        if (!this.achievements.has('five_tribes') && stats.tribeCount >= 5) {
+            this.unlockAchievement('five_tribes');
+        }
+
+        if (!this.achievements.has('long_lived') && stats.time >= 1000) {
+            this.unlockAchievement('long_lived');
+        }
+    }
+
+    checkAchievement(achievementId) {
+        if (!this.achievements.has(achievementId)) {
+            this.unlockAchievement(achievementId);
+        }
+    }
+
+    unlockAchievement(achievementId) {
+        this.achievements.add(achievementId);
+
+        const achievement = this.achievementDefs[achievementId];
+        if (achievement) {
+            this.showAchievement(achievement.name, achievement.desc);
+        }
+    }
+
+    showAchievement(name, description) {
+        const toast = document.getElementById('achievement-toast');
+        toast.innerHTML = `
+            <div style="font-size: 24px; margin-bottom: 8px;">🏆 Achievement Unlocked!</div>
+            <div style="font-size: 18px;">${name}</div>
+            <div style="font-size: 14px; font-weight: normal; margin-top: 4px;">${description}</div>
+        `;
+        toast.style.display = 'block';
+
+        // Play sound effect (if available)
+        // TODO: Add achievement sound
+
+        setTimeout(() => {
+            toast.style.display = 'none';
+        }, 4000);
+    }
+
+    showMessage(text, type = 'info') {
+        console.log(`[Message] ${text}`);
+
+        // Visual notification (could be enhanced with toast notifications)
+        const colors = {
+            success: '#4CAF50',
+            error: '#F44336',
+            warning: '#FF9800',
+            info: '#2196F3'
+        };
+
+        // Flash the relevant UI element
+        const flash = document.createElement('div');
+        flash.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: ${colors[type]};
+            color: white;
+            padding: 20px 40px;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: bold;
+            z-index: 3000;
+            box-shadow: 0 0 30px ${colors[type]};
+            animation: fadeOut 2s forwards;
+        `;
+        flash.textContent = text;
+        document.body.appendChild(flash);
+
+        setTimeout(() => flash.remove(), 2000);
+    }
+
+    updateMessages(deltaTime) {
+        // Update active floating message icons
+        this.activeMessages = this.activeMessages.filter(msg => {
+            msg.lifetime -= deltaTime;
+            return msg.lifetime > 0;
+        });
+
+        // Spawn new messages randomly (simulated)
+        if (Math.random() < 0.02) {
+            this.spawnFloatingMessage();
+        }
+    }
+
+    spawnFloatingMessage() {
+        // Only spawn messages if we have a renderer and organisms
+        if (!this.renderer || !this.renderer.organisms || this.renderer.organisms.size === 0) {
+            return;
+        }
+
+        const symbol = this.messageSymbols[Math.floor(Math.random() * this.messageSymbols.length)];
+
+        // Pick a random organism
+        const organismArray = Array.from(this.renderer.organisms.values());
+        const randomOrganism = organismArray[Math.floor(Math.random() * organismArray.length)];
+
+        if (!randomOrganism) return;
+
+        // Convert 3D world position to 2D screen position
+        const worldPosition = randomOrganism.position.clone();
+        worldPosition.project(this.renderer.camera);
+
+        const x = (worldPosition.x * 0.5 + 0.5) * window.innerWidth;
+        const y = (-worldPosition.y * 0.5 + 0.5) * window.innerHeight;
+
+        // Only show messages that are visible on screen
+        if (x < 0 || x > window.innerWidth || y < 0 || y > window.innerHeight) {
+            return;
+        }
+
+        const messageElement = document.createElement('div');
+        messageElement.className = 'message-icon';
+        messageElement.textContent = symbol;
+        messageElement.style.left = x + 'px';
+        messageElement.style.top = y + 'px';
+
+        document.body.appendChild(messageElement);
+
+        setTimeout(() => messageElement.remove(), 8000);
+
+        this.activeMessages.push({
+            element: messageElement,
+            lifetime: 8,
+            symbol: symbol
+        });
     }
 }

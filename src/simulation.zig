@@ -29,19 +29,25 @@ pub const Simulation = struct {
 
     /// Initialize simulation
     pub fn init(allocator: std.mem.Allocator, seed: u32, max_organisms: usize) !Simulation {
-        return .{
-            .organisms = try organism.Organisms.init(allocator, max_organisms),
-            .grid = spatial_grid.SpatialGrid.init(allocator),
-            .tribes = tribe.Tribes.init(),
-            .buildings = try building.Buildings.init(allocator, 1000),
-            .equipment_mgr = try equipment.EquipmentManager.init(allocator, 500),
-            .messages = try message.MessageQueue.init(allocator, 1000),
-            .language_stats = message.LanguageStats.init(),
-            .rng = math.Rng.init(seed),
-            .time = 0,
-            .frame_count = 0,
-            .allocator = allocator,
-        };
+        // Limit capacities to fit in constrained memory
+        const org_cap = @min(max_organisms, 50);
+
+        // Build piece by piece to avoid large stack frame
+        var sim: Simulation = undefined;
+        sim.allocator = allocator;
+        sim.rng = math.Rng.init(seed);
+        sim.time = 0;
+        sim.frame_count = 0;
+
+        sim.organisms = try organism.Organisms.init(allocator, org_cap);
+        sim.grid = spatial_grid.SpatialGrid.init(allocator);
+        sim.tribes = tribe.Tribes.init();
+        sim.buildings = try building.Buildings.init(allocator, 30);
+        sim.equipment_mgr = try equipment.EquipmentManager.init(allocator, 30);
+        sim.messages = try message.MessageQueue.init(allocator, 50);
+        sim.language_stats = message.LanguageStats.init();
+
+        return sim;
     }
 
     pub fn deinit(self: *Simulation) void {

@@ -5,10 +5,10 @@ const std = @import("std");
 const math = @import("math.zig");
 
 /// Maximum number of tribes
-pub const MAX_TRIBES: usize = 16;
+pub const MAX_TRIBES: usize = 4;
 
 /// Maximum members tracked per tribe
-pub const MAX_MEMBERS_PER_TRIBE: usize = 256;
+pub const MAX_MEMBERS_PER_TRIBE: usize = 32;
 
 /// Tribe data
 pub const Tribe = struct {
@@ -26,7 +26,7 @@ pub const Tribe = struct {
     member_count: usize,
 
     // Buildings (indices into building array)
-    building_ids: [64]u32,
+    building_ids: [16]u32,
     building_count: usize,
 
     // Color for rendering
