@@ -468,7 +468,8 @@ export class WasmUI {
         if (organismData) {
             const tribeIds = new Set();
             for (let i = 0; i < organismData.count; i++) {
-                if (organismData.alive[i] && organismData.tribeIds[i] > 0) {
+                // 0xFFFFFFFF means no tribe, valid tribe IDs are 0+
+                if (organismData.alive[i] && organismData.tribeIds[i] < 0xFFFFFFFF) {
                     tribeIds.add(organismData.tribeIds[i]);
                 }
             }

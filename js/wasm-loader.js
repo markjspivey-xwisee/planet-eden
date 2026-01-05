@@ -124,8 +124,8 @@ export class WasmModule {
         };
     }
 
-    // Spawn organism
-    spawnOrganism(type, x, y, z, tribeId = 0) {
+    // Spawn organism (tribeId 0xFFFFFFFF = no tribe)
+    spawnOrganism(type, x, y, z, tribeId = 0xFFFFFFFF) {
         if (!this.exports) return 0xFFFFFFFF;
         return this.exports.spawnOrganism(type, x, y, z, tribeId);
     }
@@ -172,7 +172,8 @@ export class WasmModule {
         const uniqueTribeIds = new Set();
 
         for (let i = 0; i < data.count; i++) {
-            if (data.alive[i] && data.tribeIds[i] > 0) {
+            // Check for valid tribe ID (0xFFFFFFFF means no tribe)
+            if (data.alive[i] && data.tribeIds[i] < 0xFFFFFFFF) {
                 uniqueTribeIds.add(data.tribeIds[i]);
                 console.log(`[WASM Loader] Found organism ${i} with tribe ${data.tribeIds[i]}, type ${data.types[i]}`);
             }
