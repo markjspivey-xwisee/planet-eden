@@ -421,24 +421,38 @@
         /* Mobile Styles */
         @media screen and (max-width: 900px) {
             .mobile-panel-toggle {
-                display: block;
+                display: block !important;
             }
 
-            .hud-panel {
-                position: fixed;
+            /* Hide ALL panels by default on mobile */
+            .hud-panel,
+            #tribe-panel,
+            #stats-panel,
+            #god-powers-panel,
+            #chart-panel,
+            #controls-panel {
+                display: none !important;
+                position: fixed !important;
                 left: 10px !important;
                 right: 10px !important;
                 width: auto !important;
-                max-width: none !important;
+                max-width: calc(100vw - 20px) !important;
                 max-height: 40vh !important;
                 padding: 12px !important;
                 font-size: 12px !important;
                 border-radius: 8px !important;
-                display: none;
+                overflow-y: auto !important;
+                z-index: 1000 !important;
             }
 
-            .hud-panel.mobile-active {
-                display: block;
+            /* Only show the active panel */
+            .hud-panel.mobile-active,
+            #tribe-panel.mobile-active,
+            #stats-panel.mobile-active,
+            #god-powers-panel.mobile-active,
+            #chart-panel.mobile-active,
+            #controls-panel.mobile-active {
+                display: block !important;
             }
 
             .hud-panel h3 {
@@ -608,7 +622,7 @@
     ">Clear</div>
 
     <!-- Tribe Panel -->
-    <div id="tribe-panel" class="hud-panel">
+    <div id="tribe-panel" class="hud-panel mobile-active">
         <h3>🏛️ Tribal Civilizations</h3>
         <div id="tribe-list"></div>
     </div>
