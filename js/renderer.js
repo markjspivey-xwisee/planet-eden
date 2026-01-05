@@ -2578,160 +2578,31 @@ export class Renderer {
         const buildingGroup = new THREE.Group();
         const buildingId = Date.now() + Math.random();
 
-        // Building scale - doorways match humanoid height (~1.25 units)
+        // Building scale
         const scale = 1.5;
 
-        // Building type configurations
-        const buildingConfigs = {
-            hut: { wallColor: 0xCD853F, roofColor: 0x8B7355, capacity: 4, hasChimney: true },
-            storage: { wallColor: 0x8B4513, roofColor: 0x654321, capacity: 0, hasChimney: false },
-            workshop: { wallColor: 0x696969, roofColor: 0x4a4a4a, capacity: 2, hasChimney: true },
-            farm: { wallColor: 0x9ACD32, roofColor: 0x556B2F, capacity: 0, hasChimney: false },
-            barracks: { wallColor: 0x8B0000, roofColor: 0x4a0000, capacity: 8, hasChimney: true }
-        };
+        // Building capacity for each type
+        const capacityMap = { hut: 4, storage: 0, workshop: 2, farm: 0, barracks: 8 };
+        const capacity = capacityMap[buildingType] || 4;
 
-        const config = buildingConfigs[buildingType] || buildingConfigs.hut;
-
-        // Stone foundation platform
-        const base = new THREE.Mesh(
-            new THREE.CylinderGeometry(1.8 * scale, 2.0 * scale, 0.3, 12),
-            new THREE.MeshStandardMaterial({
-                color: 0x696969,
-                roughness: 0.95
-            })
-        );
-        base.position.y = 0.15;
-        base.castShadow = true;
-        base.receiveShadow = true;
-        buildingGroup.add(base);
-
-        // Wooden walls
-        const walls = new THREE.Mesh(
-            new THREE.CylinderGeometry(1.5 * scale, 1.7 * scale, 2.0 * scale, 12),
-            new THREE.MeshStandardMaterial({
-                color: config.wallColor,
-                roughness: 0.85
-            })
-        );
-        walls.position.y = 1.0 * scale + 0.3;
-        walls.castShadow = true;
-        walls.receiveShadow = true;
-        buildingGroup.add(walls);
-
-        // Door frame
-        const doorFrame = new THREE.Mesh(
-            new THREE.BoxGeometry(0.8 * scale, 1.5 * scale, 0.3),
-            new THREE.MeshStandardMaterial({
-                color: 0x8B4513,
-                roughness: 0.9
-            })
-        );
-        doorFrame.position.set(0, 0.75 * scale + 0.3, 1.6 * scale);
-        doorFrame.castShadow = true;
-        buildingGroup.add(doorFrame);
-
-        // Door opening (dark)
-        const doorOpening = new THREE.Mesh(
-            new THREE.BoxGeometry(0.6 * scale, 1.3 * scale, 0.35),
-            new THREE.MeshStandardMaterial({
-                color: 0x1a1a1a,
-                roughness: 1.0
-            })
-        );
-        doorOpening.position.set(0, 0.65 * scale + 0.3, 1.65 * scale);
-        buildingGroup.add(doorOpening);
-
-        // Roof
-        const roof = new THREE.Mesh(
-            new THREE.ConeGeometry(2.2 * scale, 1.5 * scale, 12),
-            new THREE.MeshStandardMaterial({
-                color: config.roofColor,
-                roughness: 0.95
-            })
-        );
-        roof.position.y = 2.0 * scale + 0.75 * scale + 0.3;
-        roof.castShadow = true;
-        buildingGroup.add(roof);
-
-        // Chimney/smoke hole for certain buildings
-        if (config.hasChimney) {
-            const chimney = new THREE.Mesh(
-                new THREE.CylinderGeometry(0.25 * scale, 0.2 * scale, 0.3),
-                new THREE.MeshStandardMaterial({
-                    color: 0x4a4a4a,
-                    roughness: 0.9
-                })
-            );
-            chimney.position.y = 2.0 * scale + 1.5 * scale + 0.3;
-            buildingGroup.add(chimney);
-        }
-
-        // Window openings on sides
-        for (let angle of [Math.PI / 2, -Math.PI / 2]) {
-            const window = new THREE.Mesh(
-                new THREE.BoxGeometry(0.4 * scale, 0.5 * scale, 0.3),
-                new THREE.MeshStandardMaterial({
-                    color: 0x2a2a2a,
-                    roughness: 1.0
-                })
-            );
-            window.position.set(
-                Math.sin(angle) * 1.6 * scale,
-                1.2 * scale + 0.3,
-                Math.cos(angle) * 1.6 * scale
-            );
-            window.rotation.y = angle;
-            buildingGroup.add(window);
-        }
-
-        // Add building-specific decorations
-        if (buildingType === 'storage') {
-            // Add crates outside
-            for (let i = 0; i < 3; i++) {
-                const crate = new THREE.Mesh(
-                    new THREE.BoxGeometry(0.4, 0.4, 0.4),
-                    new THREE.MeshStandardMaterial({ color: 0x8B4513, roughness: 0.9 })
-                );
-                crate.position.set(
-                    Math.cos(i * 2) * 2.5 * scale,
-                    0.2,
-                    Math.sin(i * 2) * 2.5 * scale
-                );
-                crate.castShadow = true;
-                buildingGroup.add(crate);
-            }
-        } else if (buildingType === 'workshop') {
-            // Add anvil
-            const anvil = new THREE.Mesh(
-                new THREE.BoxGeometry(0.5, 0.3, 0.3),
-                new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.5, metalness: 0.8 })
-            );
-            anvil.position.set(2.5 * scale, 0.15, 0);
-            anvil.castShadow = true;
-            buildingGroup.add(anvil);
-        } else if (buildingType === 'farm') {
-            // Add fence posts
-            for (let i = 0; i < 4; i++) {
-                const post = new THREE.Mesh(
-                    new THREE.CylinderGeometry(0.05, 0.05, 0.6, 6),
-                    new THREE.MeshStandardMaterial({ color: 0x8B4513, roughness: 0.9 })
-                );
-                const angle = (i / 4) * Math.PI * 2;
-                post.position.set(
-                    Math.cos(angle) * 3 * scale,
-                    0.3,
-                    Math.sin(angle) * 3 * scale
-                );
-                buildingGroup.add(post);
-            }
-        } else if (buildingType === 'barracks') {
-            // Add weapon rack
-            const rack = new THREE.Mesh(
-                new THREE.BoxGeometry(0.8, 0.6, 0.1),
-                new THREE.MeshStandardMaterial({ color: 0x4a3728, roughness: 0.9 })
-            );
-            rack.position.set(2.5 * scale, 0.4, 0);
-            buildingGroup.add(rack);
+        // Create unique building based on type
+        switch (buildingType) {
+            case 'farm':
+                this.createFarmBuilding(buildingGroup, scale);
+                break;
+            case 'storage':
+                this.createStorageBuilding(buildingGroup, scale);
+                break;
+            case 'workshop':
+                this.createWorkshopBuilding(buildingGroup, scale);
+                break;
+            case 'barracks':
+                this.createBarracksBuilding(buildingGroup, scale);
+                break;
+            case 'hut':
+            default:
+                this.createHutBuilding(buildingGroup, scale);
+                break;
         }
 
         // Position on planet surface
@@ -2764,7 +2635,7 @@ export class Renderer {
             flatZ: flatZ,
             createdAt: Date.now(),
             health: 100,
-            capacity: config.capacity,
+            capacity: capacity,
             occupants: [],
             resources: { wood: 0, stone: 0, gold: 0, iron: 0 }
         });
@@ -2772,6 +2643,310 @@ export class Renderer {
         const cost = this.BUILDING_COSTS[buildingType] || this.BUILDING_COSTS.hut;
         console.log(`[Renderer] ${buildingType} built for tribe ${tribeId} (cost: ${JSON.stringify(cost)})`);
         return buildingId;
+    }
+
+    // === UNIQUE BUILDING CREATION METHODS ===
+
+    createHutBuilding(group, scale) {
+        // Round thatched hut with cone roof
+        const base = new THREE.Mesh(
+            new THREE.CylinderGeometry(1.8 * scale, 2.0 * scale, 0.3, 12),
+            new THREE.MeshStandardMaterial({ color: 0x696969, roughness: 0.95 })
+        );
+        base.position.y = 0.15;
+        base.castShadow = true;
+        group.add(base);
+
+        const walls = new THREE.Mesh(
+            new THREE.CylinderGeometry(1.5 * scale, 1.7 * scale, 2.0 * scale, 12),
+            new THREE.MeshStandardMaterial({ color: 0xCD853F, roughness: 0.85 })
+        );
+        walls.position.y = 1.0 * scale + 0.3;
+        walls.castShadow = true;
+        group.add(walls);
+
+        const roof = new THREE.Mesh(
+            new THREE.ConeGeometry(2.2 * scale, 1.5 * scale, 12),
+            new THREE.MeshStandardMaterial({ color: 0x8B7355, roughness: 0.95 })
+        );
+        roof.position.y = 2.0 * scale + 0.75 * scale + 0.3;
+        roof.castShadow = true;
+        group.add(roof);
+
+        // Door
+        const door = new THREE.Mesh(
+            new THREE.BoxGeometry(0.6 * scale, 1.3 * scale, 0.2),
+            new THREE.MeshStandardMaterial({ color: 0x1a1a1a })
+        );
+        door.position.set(0, 0.65 * scale + 0.3, 1.65 * scale);
+        group.add(door);
+    }
+
+    createFarmBuilding(group, scale) {
+        // Open farm structure - no walls, just fenced area with crops
+
+        // Dirt plot base
+        const plot = new THREE.Mesh(
+            new THREE.BoxGeometry(4 * scale, 0.15, 4 * scale),
+            new THREE.MeshStandardMaterial({ color: 0x5C4033, roughness: 1.0 })
+        );
+        plot.position.y = 0.075;
+        plot.castShadow = true;
+        group.add(plot);
+
+        // Wooden fence posts around perimeter
+        const fencePositions = [
+            [-2, 0, -2], [0, 0, -2], [2, 0, -2],
+            [-2, 0, 2], [0, 0, 2], [2, 0, 2],
+            [-2, 0, 0], [2, 0, 0]
+        ];
+        for (const [x, _, z] of fencePositions) {
+            const post = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.08 * scale, 0.1 * scale, 1.0 * scale, 6),
+                new THREE.MeshStandardMaterial({ color: 0x8B4513, roughness: 0.9 })
+            );
+            post.position.set(x * scale, 0.5 * scale, z * scale);
+            post.castShadow = true;
+            group.add(post);
+        }
+
+        // Horizontal fence rails
+        const railMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513, roughness: 0.9 });
+        for (const z of [-2, 2]) {
+            const rail = new THREE.Mesh(
+                new THREE.BoxGeometry(4 * scale, 0.1 * scale, 0.08 * scale),
+                railMaterial
+            );
+            rail.position.set(0, 0.6 * scale, z * scale);
+            group.add(rail);
+        }
+
+        // Crop rows (green rectangles representing plants)
+        for (let row = -1; row <= 1; row++) {
+            for (let col = -1; col <= 1; col++) {
+                const crop = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.6 * scale, 0.4 * scale, 0.6 * scale),
+                    new THREE.MeshStandardMaterial({ color: 0x228B22, roughness: 0.8 })
+                );
+                crop.position.set(col * 1.0 * scale, 0.35, row * 1.0 * scale);
+                crop.castShadow = true;
+                group.add(crop);
+            }
+        }
+
+        // Small shed in corner
+        const shed = new THREE.Mesh(
+            new THREE.BoxGeometry(0.8 * scale, 0.8 * scale, 0.8 * scale),
+            new THREE.MeshStandardMaterial({ color: 0xA0522D, roughness: 0.9 })
+        );
+        shed.position.set(1.5 * scale, 0.4 * scale, -1.5 * scale);
+        shed.castShadow = true;
+        group.add(shed);
+
+        const shedRoof = new THREE.Mesh(
+            new THREE.ConeGeometry(0.6 * scale, 0.4 * scale, 4),
+            new THREE.MeshStandardMaterial({ color: 0x8B7355, roughness: 0.9 })
+        );
+        shedRoof.position.set(1.5 * scale, 0.9 * scale, -1.5 * scale);
+        shedRoof.rotation.y = Math.PI / 4;
+        group.add(shedRoof);
+    }
+
+    createStorageBuilding(group, scale) {
+        // Large rectangular warehouse
+        const base = new THREE.Mesh(
+            new THREE.BoxGeometry(3.5 * scale, 0.3, 2.5 * scale),
+            new THREE.MeshStandardMaterial({ color: 0x696969, roughness: 0.95 })
+        );
+        base.position.y = 0.15;
+        base.castShadow = true;
+        group.add(base);
+
+        // Wooden walls (box shape)
+        const walls = new THREE.Mesh(
+            new THREE.BoxGeometry(3.2 * scale, 2.0 * scale, 2.2 * scale),
+            new THREE.MeshStandardMaterial({ color: 0x8B4513, roughness: 0.85 })
+        );
+        walls.position.y = 1.0 * scale + 0.3;
+        walls.castShadow = true;
+        group.add(walls);
+
+        // Sloped roof
+        const roofGeom = new THREE.BoxGeometry(3.6 * scale, 0.3 * scale, 2.6 * scale);
+        const roof = new THREE.Mesh(
+            roofGeom,
+            new THREE.MeshStandardMaterial({ color: 0x654321, roughness: 0.9 })
+        );
+        roof.position.y = 2.15 * scale;
+        roof.castShadow = true;
+        group.add(roof);
+
+        // Large door
+        const door = new THREE.Mesh(
+            new THREE.BoxGeometry(1.0 * scale, 1.5 * scale, 0.2),
+            new THREE.MeshStandardMaterial({ color: 0x1a1a1a })
+        );
+        door.position.set(0, 0.85 * scale, 1.15 * scale);
+        group.add(door);
+
+        // Crates outside
+        for (let i = 0; i < 4; i++) {
+            const crate = new THREE.Mesh(
+                new THREE.BoxGeometry(0.5, 0.5, 0.5),
+                new THREE.MeshStandardMaterial({ color: 0xCD853F, roughness: 0.9 })
+            );
+            crate.position.set(
+                1.8 * scale + (i % 2) * 0.6,
+                0.25,
+                -0.5 + Math.floor(i / 2) * 0.6
+            );
+            crate.castShadow = true;
+            group.add(crate);
+        }
+    }
+
+    createWorkshopBuilding(group, scale) {
+        // Smithy/workshop with forge
+        const base = new THREE.Mesh(
+            new THREE.BoxGeometry(2.8 * scale, 0.3, 2.8 * scale),
+            new THREE.MeshStandardMaterial({ color: 0x4a4a4a, roughness: 0.95 })
+        );
+        base.position.y = 0.15;
+        base.castShadow = true;
+        group.add(base);
+
+        // Stone walls
+        const walls = new THREE.Mesh(
+            new THREE.BoxGeometry(2.5 * scale, 1.8 * scale, 2.5 * scale),
+            new THREE.MeshStandardMaterial({ color: 0x696969, roughness: 0.9 })
+        );
+        walls.position.y = 0.9 * scale + 0.3;
+        walls.castShadow = true;
+        group.add(walls);
+
+        // Flat roof with chimney
+        const roof = new THREE.Mesh(
+            new THREE.BoxGeometry(2.8 * scale, 0.25 * scale, 2.8 * scale),
+            new THREE.MeshStandardMaterial({ color: 0x4a4a4a, roughness: 0.9 })
+        );
+        roof.position.y = 1.9 * scale;
+        roof.castShadow = true;
+        group.add(roof);
+
+        // Tall chimney (smokestack)
+        const chimney = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.3 * scale, 0.35 * scale, 1.2 * scale, 8),
+            new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.8 })
+        );
+        chimney.position.set(0.8 * scale, 2.5 * scale, 0.8 * scale);
+        chimney.castShadow = true;
+        group.add(chimney);
+
+        // Anvil outside
+        const anvilBase = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.3, 0.35, 0.4, 8),
+            new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.5, metalness: 0.7 })
+        );
+        anvilBase.position.set(1.8 * scale, 0.2, 0);
+        anvilBase.castShadow = true;
+        group.add(anvilBase);
+
+        const anvilTop = new THREE.Mesh(
+            new THREE.BoxGeometry(0.5, 0.15, 0.25),
+            new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.4, metalness: 0.9 })
+        );
+        anvilTop.position.set(1.8 * scale, 0.47, 0);
+        anvilTop.castShadow = true;
+        group.add(anvilTop);
+
+        // Door
+        const door = new THREE.Mesh(
+            new THREE.BoxGeometry(0.8 * scale, 1.4 * scale, 0.2),
+            new THREE.MeshStandardMaterial({ color: 0x1a1a1a })
+        );
+        door.position.set(0, 0.7 * scale + 0.3, 1.3 * scale);
+        group.add(door);
+    }
+
+    createBarracksBuilding(group, scale) {
+        // Large military building
+        const base = new THREE.Mesh(
+            new THREE.BoxGeometry(4.0 * scale, 0.3, 3.0 * scale),
+            new THREE.MeshStandardMaterial({ color: 0x4a4a4a, roughness: 0.95 })
+        );
+        base.position.y = 0.15;
+        base.castShadow = true;
+        group.add(base);
+
+        // Stone/wood walls (larger building)
+        const walls = new THREE.Mesh(
+            new THREE.BoxGeometry(3.6 * scale, 2.2 * scale, 2.6 * scale),
+            new THREE.MeshStandardMaterial({ color: 0x8B0000, roughness: 0.85 })
+        );
+        walls.position.y = 1.1 * scale + 0.3;
+        walls.castShadow = true;
+        group.add(walls);
+
+        // Peaked roof
+        const roofGeom = new THREE.CylinderGeometry(0.1, 2.2 * scale, 1.2 * scale, 4);
+        const roof = new THREE.Mesh(
+            roofGeom,
+            new THREE.MeshStandardMaterial({ color: 0x4a0000, roughness: 0.9 })
+        );
+        roof.position.y = 2.8 * scale;
+        roof.rotation.y = Math.PI / 4;
+        roof.castShadow = true;
+        group.add(roof);
+
+        // Flag pole
+        const pole = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.05 * scale, 0.05 * scale, 2.0 * scale, 6),
+            new THREE.MeshStandardMaterial({ color: 0x654321, roughness: 0.9 })
+        );
+        pole.position.set(1.5 * scale, 2.5 * scale, 1.0 * scale);
+        pole.castShadow = true;
+        group.add(pole);
+
+        // Flag
+        const flag = new THREE.Mesh(
+            new THREE.PlaneGeometry(0.6 * scale, 0.4 * scale),
+            new THREE.MeshStandardMaterial({
+                color: 0xCC0000,
+                roughness: 0.8,
+                side: THREE.DoubleSide
+            })
+        );
+        flag.position.set(1.8 * scale, 3.2 * scale, 1.0 * scale);
+        flag.rotation.y = Math.PI / 2;
+        group.add(flag);
+
+        // Weapon rack
+        const rack = new THREE.Mesh(
+            new THREE.BoxGeometry(0.1, 1.0, 0.6),
+            new THREE.MeshStandardMaterial({ color: 0x654321, roughness: 0.9 })
+        );
+        rack.position.set(2.0 * scale, 0.5, -0.8 * scale);
+        rack.castShadow = true;
+        group.add(rack);
+
+        // Spears on rack
+        for (let i = 0; i < 3; i++) {
+            const spear = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.02, 0.02, 0.9, 6),
+                new THREE.MeshStandardMaterial({ color: 0x8B4513, roughness: 0.9 })
+            );
+            spear.position.set(2.0 * scale, 0.5, -0.6 * scale + i * 0.2);
+            spear.rotation.x = Math.PI / 12;
+            group.add(spear);
+        }
+
+        // Large door
+        const door = new THREE.Mesh(
+            new THREE.BoxGeometry(1.2 * scale, 1.6 * scale, 0.2),
+            new THREE.MeshStandardMaterial({ color: 0x1a1a1a })
+        );
+        door.position.set(0, 0.8 * scale + 0.3, 1.35 * scale);
+        group.add(door);
     }
 
     // Create different plant visuals based on plant type

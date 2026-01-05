@@ -5,7 +5,7 @@ const std = @import("std");
 const math = @import("math.zig");
 
 /// Maximum number of tribes
-pub const MAX_TRIBES: usize = 4;
+pub const MAX_TRIBES: usize = 8;
 
 /// Maximum members tracked per tribe
 pub const MAX_MEMBERS_PER_TRIBE: usize = 32;

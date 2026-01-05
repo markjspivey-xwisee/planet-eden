@@ -5,9 +5,16 @@
 const std = @import("std");
 
 // Version export to verify WASM is updated
-// Version: 4 - Added velocity smoothing and position/velocity setters for water avoidance
+// Version: 5 - Increased MAX_TRIBES to 8, unique buildings
 export fn getVersion() u32 {
-    return 4;
+    return 5;
+}
+
+const tribe = @import("tribe.zig");
+
+/// Get maximum number of tribes allowed
+export fn getMaxTribes() u32 {
+    return @intCast(tribe.MAX_TRIBES);
 }
 const math = @import("math.zig");
 const simulation = @import("simulation.zig");

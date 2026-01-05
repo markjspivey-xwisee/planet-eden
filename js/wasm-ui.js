@@ -268,23 +268,46 @@ export class WasmUI {
         });
     }
 
+    // Tribe name generator - unique names for each tribe
+    getTribeName(tribeId) {
+        const prefixes = ['Sun', 'Moon', 'Star', 'Storm', 'River', 'Mountain', 'Forest', 'Thunder'];
+        const suffixes = ['Walkers', 'Seekers', 'Keepers', 'Hunters', 'Builders', 'Warriors', 'Singers', 'Dancers'];
+        return `${prefixes[tribeId % prefixes.length]} ${suffixes[Math.floor(tribeId / prefixes.length) % suffixes.length]}`;
+    }
+
     // God Power Implementations
     godPowerSpawnTribe() {
+        // Check if at max tribes first
+        const currentTribes = this.wasmModule.getStats().tribeCount;
+        const maxTribes = this.wasmModule.exports.getMaxTribes ? this.wasmModule.exports.getMaxTribes() : 8;
+
+        if (currentTribes >= maxTribes) {
+            this.showMessage(`❌ Maximum tribes reached (${maxTribes})`, 'error');
+            return;
+        }
+
         const tribeId = this.wasmModule.createTribe();
 
         if (tribeId !== 0xFFFFFFFF) {
-            // Spawn 8 humanoids for the new tribe
+            const tribeName = this.getTribeName(tribeId);
+
+            // Spawn 8 humanoids for the new tribe at a random location
+            const baseX = (Math.random() - 0.5) * 60;
+            const baseZ = (Math.random() - 0.5) * 60;
+
             for (let i = 0; i < 8; i++) {
                 const angle = (i / 8) * Math.PI * 2;
-                const radius = 15;
-                const x = Math.cos(angle) * radius;
-                const z = Math.sin(angle) * radius;
+                const radius = 5;
+                const x = baseX + Math.cos(angle) * radius;
+                const z = baseZ + Math.sin(angle) * radius;
 
                 this.wasmModule.spawnOrganism(OrganismType.HUMANOID, x, 5, z, tribeId);
             }
 
-            this.showMessage(`👥 New tribe ${tribeId} spawned with 8 members!`, 'success');
+            this.showMessage(`👥 The ${tribeName} tribe has emerged! (8 members)`, 'success');
             this.checkAchievement('first_tribe');
+        } else {
+            this.showMessage(`❌ Cannot create more tribes`, 'error');
         }
     }
 
@@ -314,7 +337,8 @@ export class WasmUI {
 
         // Gift resources to a random tribe (would need WASM export for this)
         const randomTribe = tribes[Math.floor(Math.random() * tribes.length)];
-        this.showMessage(`💎 Gifted 500 resources to Tribe ${randomTribe.id}!`, 'success');
+        const tribeName = this.getTribeName(randomTribe.id);
+        this.showMessage(`💎 Gifted 500 resources to the ${tribeName}!`, 'success');
 
         // TODO: Add WASM export to actually gift resources
     }
@@ -489,11 +513,12 @@ export class WasmUI {
             const color = `rgb(${tribe.color.r}, ${tribe.color.g}, ${tribe.color.b})`;
             const foodPercent = Math.min(100, (tribe.food / 500) * 100);
             const woodPercent = Math.min(100, (tribe.wood / 500) * 100);
+            const tribeName = this.getTribeName(tribe.id);
 
             tribesHTML += `
                 <div class="tribe-card" style="border-color: ${color};">
                     <div class="tribe-name" style="color: ${color};">
-                        Tribe ${tribe.id}
+                        ${tribeName}
                     </div>
                     <div class="tribe-stat">
                         <span>👥 Members</span>
@@ -564,16 +589,20 @@ export class WasmUI {
         topTribes.forEach((tribe, index) => {
             const datasetIndex = index + 1;
             const color = `rgb(${tribe.color.r}, ${tribe.color.g}, ${tribe.color.b})`;
+            const tribeName = this.getTribeName(tribe.id);
 
             if (!this.populationHistory.datasets[datasetIndex]) {
                 this.populationHistory.datasets[datasetIndex] = {
-                    label: `Tribe ${tribe.id}`,
+                    label: tribeName,
                     data: new Array(this.populationHistory.labels.length - 1).fill(0),
                     borderColor: color,
                     backgroundColor: `rgba(${tribe.color.r}, ${tribe.color.g}, ${tribe.color.b}, 0.1)`,
                     borderWidth: 1.5,
                     tension: 0.3
                 };
+            } else {
+                // Update label in case tribe changed
+                this.populationHistory.datasets[datasetIndex].label = tribeName;
             }
 
             this.populationHistory.datasets[datasetIndex].data.push(tribe.memberCount);
