@@ -685,10 +685,10 @@ export class WasmUI {
             return msg.lifetime > 0;
         });
 
-        // Spawn new messages randomly (simulated)
-        if (Math.random() < 0.02) {
-            this.spawnFloatingMessage();
-        }
+        // Floating emoji messages disabled
+        // if (Math.random() < 0.02) {
+        //     this.spawnFloatingMessage();
+        // }
     }
 
     spawnFloatingMessage() {

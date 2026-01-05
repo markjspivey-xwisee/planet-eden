@@ -264,7 +264,16 @@ pub const Simulation = struct {
         pos: math.Vec3,
         tribe_id: u32,
     ) !u32 {
-        return try self.organisms.spawn(org_type, pos, tribe_id, &self.rng);
+        const organism_id = try self.organisms.spawn(org_type, pos, tribe_id, &self.rng);
+
+        // Add organism to tribe if tribe_id is valid
+        if (tribe_id < self.tribes.count) {
+            if (self.tribes.getTribe(tribe_id)) |t| {
+                _ = t.addMember(organism_id);
+            }
+        }
+
+        return organism_id;
     }
 
     /// Create a new tribe
