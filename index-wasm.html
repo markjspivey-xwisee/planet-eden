@@ -418,23 +418,24 @@
             box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
         }
 
-        /* Mobile Styles */
-        @media screen and (max-width: 900px) {
+        /* Mobile Styles - Using both display and visibility for maximum compatibility */
+        @media screen and (max-width: 960px) {
             .mobile-panel-toggle {
                 display: block !important;
+                visibility: visible !important;
             }
 
-            /* Hide ALL panels by default on mobile */
-            .hud-panel,
-            #tribe-panel,
-            #stats-panel,
-            #god-powers-panel,
-            #chart-panel,
-            #controls-panel {
+            /* Hide ALL panels by default on mobile - AGGRESSIVE */
+            .hud-panel {
                 display: none !important;
+                visibility: hidden !important;
+                opacity: 0 !important;
+                pointer-events: none !important;
                 position: fixed !important;
                 left: 10px !important;
                 right: 10px !important;
+                top: 130px !important;
+                bottom: auto !important;
                 width: auto !important;
                 max-width: calc(100vw - 20px) !important;
                 max-height: 40vh !important;
@@ -445,14 +446,35 @@
                 z-index: 1000 !important;
             }
 
-            /* Only show the active panel */
-            .hud-panel.mobile-active,
+            /* Also target by ID for higher specificity */
+            #tribe-panel,
+            #stats-panel,
+            #god-powers-panel,
+            #chart-panel,
+            #controls-panel {
+                display: none !important;
+                visibility: hidden !important;
+                opacity: 0 !important;
+                pointer-events: none !important;
+            }
+
+            /* Only show the active panel - must come AFTER hide rules */
+            .hud-panel.mobile-active {
+                display: block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+                pointer-events: auto !important;
+            }
+
             #tribe-panel.mobile-active,
             #stats-panel.mobile-active,
             #god-powers-panel.mobile-active,
             #chart-panel.mobile-active,
             #controls-panel.mobile-active {
                 display: block !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+                pointer-events: auto !important;
             }
 
             .hud-panel h3 {
@@ -461,32 +483,10 @@
                 padding-bottom: 6px !important;
             }
 
-            /* Stack panels at top when shown */
-            #tribe-panel {
-                top: 130px !important;
-                bottom: auto !important;
-            }
-
-            #stats-panel {
-                top: 130px !important;
-                bottom: auto !important;
-            }
-
-            #god-powers-panel {
-                top: 130px !important;
-                bottom: auto !important;
-            }
-
+            /* Chart panel needs min-height */
             #chart-panel {
-                top: 130px !important;
-                bottom: auto !important;
                 height: auto !important;
                 min-height: 200px !important;
-            }
-
-            #controls-panel {
-                top: 130px !important;
-                bottom: auto !important;
             }
 
             /* Top UI elements compact mode */
