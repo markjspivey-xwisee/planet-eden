@@ -292,9 +292,9 @@ export class WasmUI {
             this.godPowerGiftResources();
         });
 
-        // F4 - Trigger War
+        // F4 - Lightning Strike
         document.getElementById('btn-trigger-war').addEventListener('click', () => {
-            this.godPowerTriggerWar();
+            this.godPowerLightning();
         });
 
         // F5 - Plague
@@ -312,7 +312,7 @@ export class WasmUI {
             if (e.key === 'F1') { e.preventDefault(); this.godPowerSpawnTribe(); }
             if (e.key === 'F2') { e.preventDefault(); this.godPowerMassSpawn(); }
             if (e.key === 'F3') { e.preventDefault(); this.godPowerGiftResources(); }
-            if (e.key === 'F4') { e.preventDefault(); this.godPowerTriggerWar(); }
+            if (e.key === 'F4') { e.preventDefault(); this.godPowerLightning(); }
             if (e.key === 'F5') { e.preventDefault(); this.godPowerPlague(); }
             if (e.key === 'F6') { e.preventDefault(); this.godPowerBlessing(); }
         });
@@ -341,20 +341,21 @@ export class WasmUI {
         if (tribeId !== 0xFFFFFFFF) {
             const tribeName = this.getTribeName(tribeId);
 
-            // Spawn 8 humanoids for the new tribe at a random location
-            const baseX = (Math.random() - 0.5) * 60;
-            const baseZ = (Math.random() - 0.5) * 60;
+            // Spawn 10 humanoids for the new tribe on LAND
+            let spawnedCount = 0;
+            const basePos = this.renderer?.findLandPosition() || { flatX: 0, flatZ: 0 };
 
-            for (let i = 0; i < 8; i++) {
-                const angle = (i / 8) * Math.PI * 2;
+            for (let i = 0; i < 10; i++) {
+                const angle = (i / 10) * Math.PI * 2;
                 const radius = 5;
-                const x = baseX + Math.cos(angle) * radius;
-                const z = baseZ + Math.sin(angle) * radius;
+                const x = basePos.flatX + Math.cos(angle) * radius;
+                const z = basePos.flatZ + Math.sin(angle) * radius;
 
-                this.wasmModule.spawnOrganism(OrganismType.HUMANOID, x, 5, z, tribeId);
+                const orgId = this.wasmModule.spawnOrganism(OrganismType.HUMANOID, x, 0.5, z, tribeId);
+                if (orgId !== 0xFFFFFFFF) spawnedCount++;
             }
 
-            this.showMessage(`👥 The ${tribeName} tribe has emerged! (8 members)`, 'success');
+            this.showMessage(`👥 The ${tribeName} tribe has emerged! (${spawnedCount} members)`, 'success');
             this.checkAchievement('first_tribe');
         } else {
             this.showMessage(`❌ Cannot create more tribes`, 'error');
@@ -393,17 +394,29 @@ export class WasmUI {
         // TODO: Add WASM export to actually gift resources
     }
 
-    godPowerTriggerWar() {
-        const tribes = this.wasmModule.getAllTribes();
+    godPowerLightning() {
+        // Trigger lightning strike via weather system
+        if (this.renderer && this.renderer.weatherSystem) {
+            // Find a storm cloud to trigger from, or use any cloud
+            const clouds = this.renderer.weatherSystem.clouds || [];
+            const stormClouds = clouds.filter(c => c.weatherState === 'storm' || c.canStorm);
 
-        if (tribes.length < 2) {
-            this.showMessage('❌ Need at least 2 tribes for war', 'error');
-            return;
+            if (stormClouds.length > 0) {
+                // Trigger from a random storm cloud
+                const cloud = stormClouds[Math.floor(Math.random() * stormClouds.length)];
+                this.renderer.weatherSystem.triggerLightning(cloud);
+                this.showMessage('⚡ Lightning strikes from the heavens!', 'warning');
+            } else if (clouds.length > 0) {
+                // Force lightning from any cloud
+                const cloud = clouds[Math.floor(Math.random() * clouds.length)];
+                this.renderer.weatherSystem.triggerLightning(cloud);
+                this.showMessage('⚡ You summon divine lightning!', 'warning');
+            } else {
+                this.showMessage('❌ No clouds to strike from', 'error');
+            }
+        } else {
+            this.showMessage('❌ Weather system not available', 'error');
         }
-
-        this.showMessage('⚔️ War has been declared! Tribes will fight!', 'warning');
-
-        // TODO: Add WASM logic to mark tribes as enemies
     }
 
     godPowerPlague() {
@@ -424,20 +437,35 @@ export class WasmUI {
     }
 
     spawnRandom(type) {
-        const x = (Math.random() - 0.5) * 100;
-        const y = 5;
-        const z = (Math.random() - 0.5) * 100;
+        // Use renderer to find a valid land position
+        if (!this.renderer || !this.renderer.findLandPosition) {
+            // Fallback if renderer not available
+            const x = (Math.random() - 0.5) * 80;
+            const z = (Math.random() - 0.5) * 80;
+            const tribes = this.wasmModule.getAllTribes();
+            const tribeId = tribes.length > 0 && Math.random() < 0.7 ?
+                           tribes[Math.floor(Math.random() * tribes.length)].id : 0;
+            this.wasmModule.spawnOrganism(type, x, 0.5, z, tribeId);
+            return;
+        }
 
-        // Get random tribe or 0
+        // Find a valid land position
+        const pos = this.renderer.findLandPosition();
+        if (!pos.isLand) {
+            console.warn('Could not find valid land position for spawn');
+            return;
+        }
+
+        // Get random tribe or no tribe
         const tribes = this.wasmModule.getAllTribes();
         const tribeId = tribes.length > 0 && Math.random() < 0.7 ?
-                       tribes[Math.floor(Math.random() * tribes.length)].id : 0;
+                       tribes[Math.floor(Math.random() * tribes.length)].id : 0xFFFFFFFF;
 
-        const orgId = this.wasmModule.spawnOrganism(type, x, y, z, tribeId);
+        const orgId = this.wasmModule.spawnOrganism(type, pos.flatX, 0.5, pos.flatZ, tribeId);
 
         if (orgId !== 0xFFFFFFFF) {
             const typeNames = ['Plant', 'Herbivore', 'Carnivore', 'Humanoid'];
-            console.log(`Spawned ${typeNames[type]} #${orgId}`);
+            console.log(`Spawned ${typeNames[type]} #${orgId} on land at (${pos.flatX.toFixed(1)}, ${pos.flatZ.toFixed(1)})`);
         }
     }
 

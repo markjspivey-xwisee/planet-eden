@@ -103,28 +103,28 @@ class PlanetEdenWasm {
             return false;
         };
 
-        // Spawn more vegetation (30 plants/trees) - only on land
+        // Spawn abundant vegetation (150 plants/trees) - only on land
         // Plants can reproduce via seeding, so a good starting forest is important
         let plantCount = 0;
-        for (let i = 0; i < 30; i++) {
+        for (let i = 0; i < 150; i++) {
             if (spawnOnLand(OrganismType.PLANT, NO_TRIBE)) plantCount++;
         }
 
-        // Spawn herbivores (8 animals) - belong to tribe1, only on land
+        // Spawn herbivores (15 animals) - belong to tribe1, only on land
         let herbCount = 0;
-        for (let i = 0; i < 8; i++) {
+        for (let i = 0; i < 15; i++) {
             if (spawnOnLand(OrganismType.HERBIVORE, tribe1)) herbCount++;
         }
 
-        // Spawn carnivores (3 predators) - wild, only on land
+        // Spawn carnivores (5 predators) - wild, only on land
         let carnCount = 0;
-        for (let i = 0; i < 3; i++) {
+        for (let i = 0; i < 5; i++) {
             if (spawnOnLand(OrganismType.CARNIVORE, NO_TRIBE)) carnCount++;
         }
 
-        // Spawn first tribe members (5 humanoids) - only on land
+        // Spawn first tribe members (8 humanoids) - only on land
         let humanCount = 0;
-        for (let i = 0; i < 5; i++) {
+        for (let i = 0; i < 8; i++) {
             if (spawnOnLand(OrganismType.HUMANOID, tribe1)) humanCount++;
         }
 
@@ -133,7 +133,7 @@ class PlanetEdenWasm {
         console.log(`[Planet Eden WASM] 🌲 ${plantCount} plants/trees (will grow and seed)`);
         console.log(`[Planet Eden WASM] 🦌 ${herbCount} herbivores`);
         console.log(`[Planet Eden WASM] 🦁 ${carnCount} carnivores`);
-        console.log(`[Planet Eden WASM] Total: ${plantCount + herbCount + carnCount + humanCount} organisms (max 50)`);
+        console.log(`[Planet Eden WASM] Total: ${plantCount + herbCount + carnCount + humanCount} organisms`);
 
         // Verify organisms were spawned
         const finalStats = this.wasmModule.getStats();

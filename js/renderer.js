@@ -53,10 +53,10 @@ export class Renderer {
 
         // Plant growth and reproduction system
         this.plantData = new Map(); // id -> { age, growth, maxGrowth, canSeed, seedTimer, plantType }
-        this.GROWTH_RATE = 0.02; // Growth per second
-        this.SEED_INTERVAL = 30; // Seconds between seed attempts
-        this.SEED_RADIUS = 8; // How far seeds can spread
-        this.MAX_PLANTS_NEARBY = 5; // Prevents overcrowding
+        this.GROWTH_RATE = 0.08; // Growth per second (4x faster)
+        this.SEED_INTERVAL = 12; // Seconds between seed attempts (faster seeding)
+        this.SEED_RADIUS = 12; // How far seeds can spread (wider spread)
+        this.MAX_PLANTS_NEARBY = 15; // Allow denser forests
 
         // Fire system
         this.fires = new Map(); // id -> { mesh, position, intensity, spreadTimer, targetId, targetType }

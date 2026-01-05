@@ -5,9 +5,9 @@
 const std = @import("std");
 
 // Version export to verify WASM is updated
-// Version: 6 - SIMD enabled, mobile hide button
+// Version: 7 - Land-only spawning, lightning power, more plants
 export fn getVersion() u32 {
-    return 6;
+    return 7;
 }
 
 const tribe = @import("tribe.zig");
