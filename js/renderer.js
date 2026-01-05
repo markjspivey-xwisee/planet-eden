@@ -65,6 +65,14 @@ export class Renderer {
         this.FIRE_SPREAD_RADIUS = 5; // How far fire can spread
         this.FIRE_DAMAGE_RATE = 10; // Damage per second
 
+        // Water cycle system
+        this.waterLevel = 0.5; // Base water level (0-1, affects water sphere scale)
+        this.waterLevelMin = 0.3; // Minimum water level (drought)
+        this.waterLevelMax = 0.8; // Maximum water level (flooding)
+        this.rainAccumulationRate = 0.002; // Water gained per second per raining cloud
+        this.evaporationRate = 0.001; // Water lost per second in sun
+        this.baseWaterRadius = PLANET_RADIUS + 0.3; // Original water sphere radius
+
         // Initialize time system
         this.timeSystem = new TimeSystem({
             dayLengthSeconds: 120, // 2 minutes per day
@@ -854,6 +862,63 @@ export class Renderer {
         }
     }
 
+    // Update water cycle - rain accumulation and sun evaporation
+    updateWaterCycle(deltaSeconds, timeInfo) {
+        if (!this.weatherSystem || !this.water) return;
+
+        const clouds = this.weatherSystem.clouds;
+        let rainContribution = 0;
+
+        // Count active rain clouds
+        for (const cloud of clouds) {
+            if (cloud.weatherState === 'rain' || cloud.weatherState === 'storm') {
+                // Each raining cloud contributes to water level
+                const intensity = cloud.weatherIntensity;
+                rainContribution += intensity * this.rainAccumulationRate;
+            }
+        }
+
+        // Add rain water
+        this.waterLevel += rainContribution * deltaSeconds;
+
+        // Evaporation based on sun intensity (only during day)
+        if (timeInfo && timeInfo.sunIntensity > 0.3) {
+            const evaporationAmount = this.evaporationRate * timeInfo.sunIntensity * deltaSeconds;
+
+            // Less evaporation when it's cloudy/raining
+            const weatherInfo = this.weatherSystem.getWeatherInfo();
+            const cloudCover = Math.min(1, weatherInfo.activeCloudCount / 10);
+            const reducedEvaporation = evaporationAmount * (1 - cloudCover * 0.7);
+
+            this.waterLevel -= reducedEvaporation;
+        }
+
+        // Clamp water level
+        this.waterLevel = Math.max(this.waterLevelMin, Math.min(this.waterLevelMax, this.waterLevel));
+
+        // Update water mesh scale to reflect water level
+        // Map water level (0.3-0.8) to scale (0.98-1.02) for subtle visual change
+        const scaleFactor = 0.98 + (this.waterLevel - this.waterLevelMin) / (this.waterLevelMax - this.waterLevelMin) * 0.04;
+        const newRadius = this.baseWaterRadius * scaleFactor;
+
+        // Update water mesh geometry scale
+        this.water.scale.setScalar(scaleFactor);
+
+        // Update water opacity based on level (fuller = more opaque blue)
+        const opacity = 0.6 + (this.waterLevel - this.waterLevelMin) / (this.waterLevelMax - this.waterLevelMin) * 0.25;
+        this.water.material.opacity = opacity;
+
+        // Water color shifts with level - drought is more murky, flood is clearer blue
+        const levelNorm = (this.waterLevel - this.waterLevelMin) / (this.waterLevelMax - this.waterLevelMin);
+        const r = 0.0 + (1 - levelNorm) * 0.1;  // Slightly brown when low
+        const g = 0.4 + levelNorm * 0.15;       // More cyan when high
+        const b = 0.6 + levelNorm * 0.2;        // More blue when high
+        this.water.material.color.setRGB(r, g, b);
+
+        // Optional: Add puddle effects or flooding indicators
+        // (Could create temporary water pools on low terrain when level is high)
+    }
+
     updateWeatherDisplay(weather) {
         const weatherDisplay = document.getElementById('weather-display');
         if (weatherDisplay) {
@@ -863,7 +928,14 @@ export class Renderer {
                 'rain': '\u{1F327}',   // cloud with rain
                 'storm': '\u26C8'      // thunder cloud
             };
-            weatherDisplay.textContent = `${icons[weather] || ''} ${weather.charAt(0).toUpperCase() + weather.slice(1)}`;
+
+            // Water level indicator
+            const waterPercent = Math.round((this.waterLevel - this.waterLevelMin) / (this.waterLevelMax - this.waterLevelMin) * 100);
+            let waterIcon = '\u{1F4A7}'; // droplet
+            if (waterPercent < 30) waterIcon = '\u{1F3DC}'; // desert (drought)
+            else if (waterPercent > 80) waterIcon = '\u{1F30A}'; // wave (flooding)
+
+            weatherDisplay.textContent = `${icons[weather] || ''} ${weather.charAt(0).toUpperCase() + weather.slice(1)} | ${waterIcon} ${waterPercent}%`;
         }
     }
 
@@ -1088,10 +1160,11 @@ export class Renderer {
 
         // Create building info panel
         this.buildingPanel = document.createElement('div');
+        this.buildingPanel.className = 'info-panel-mobile';
         this.buildingPanel.style.cssText = `
             position: fixed;
             top: 20px;
-            left: 20px;
+            right: 320px;
             background: rgba(20, 20, 30, 0.95);
             border: 2px solid rgba(255, 170, 0, 0.6);
             border-radius: 12px;
@@ -1099,6 +1172,7 @@ export class Renderer {
             color: white;
             font-family: 'Segoe UI', Arial, sans-serif;
             min-width: 280px;
+            max-width: 350px;
             z-index: 1000;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
         `;
@@ -1258,10 +1332,11 @@ export class Renderer {
         this.hideResourcePanel();
 
         this.resourcePanel = document.createElement('div');
+        this.resourcePanel.className = 'info-panel-mobile';
         this.resourcePanel.style.cssText = `
             position: fixed;
             top: 20px;
-            left: 20px;
+            right: 320px;
             background: rgba(20, 30, 30, 0.95);
             border: 2px solid rgba(0, 255, 255, 0.6);
             border-radius: 12px;
@@ -1269,6 +1344,7 @@ export class Renderer {
             color: white;
             font-family: 'Segoe UI', Arial, sans-serif;
             min-width: 250px;
+            max-width: 320px;
             z-index: 1000;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
         `;
@@ -1361,10 +1437,11 @@ export class Renderer {
         this.hideCloudPanel();
 
         this.cloudPanel = document.createElement('div');
+        this.cloudPanel.className = 'info-panel-mobile';
         this.cloudPanel.style.cssText = `
             position: fixed;
             top: 20px;
-            left: 20px;
+            right: 320px;
             background: rgba(30, 40, 60, 0.95);
             border: 2px solid rgba(170, 220, 255, 0.6);
             border-radius: 12px;
@@ -1372,6 +1449,7 @@ export class Renderer {
             color: white;
             font-family: 'Segoe UI', Arial, sans-serif;
             min-width: 260px;
+            max-width: 320px;
             z-index: 1000;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
         `;
@@ -1485,12 +1563,14 @@ export class Renderer {
         if (!this.neuralNetworkPanel) {
             this.neuralNetworkPanel = document.createElement('div');
             this.neuralNetworkPanel.id = 'neural-network-panel';
+            this.neuralNetworkPanel.className = 'info-panel-mobile';
             this.neuralNetworkPanel.style.cssText = `
                 position: fixed;
                 top: 50%;
                 left: 50%;
                 transform: translate(-50%, -50%);
                 width: 700px;
+                max-width: 95vw;
                 max-height: 90vh;
                 overflow-y: auto;
                 background: rgba(0, 0, 0, 0.95);
@@ -3287,6 +3367,9 @@ export class Renderer {
         if (this.weatherSystem) {
             this.weatherSystem.update(deltaMs, timeInfo);
         }
+
+        // Update water cycle (rain accumulation and sun evaporation)
+        this.updateWaterCycle(deltaMs / 1000, timeInfo);
 
         // Apply animations to all organisms
         const weatherInfo = this.weatherSystem ? this.weatherSystem.getWeatherInfo() : { windStrength: 0.3, windDirection: { x: 1, z: 0.5 } };

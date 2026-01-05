@@ -40,6 +40,11 @@ export class WasmUI {
 
         // Active messages (for visualization)
         this.activeMessages = [];
+
+        // Mobile panel state
+        this.mobilePanelIndex = 0;
+        this.mobilePanels = ['tribe-panel', 'stats-panel', 'god-powers-panel', 'chart-panel', 'controls-panel'];
+        this.isMobile = false;
     }
 
     init() {
@@ -55,7 +60,80 @@ export class WasmUI {
         // Setup god powers
         this.setupGodPowers();
 
+        // Setup mobile panel toggle
+        this.setupMobilePanels();
+
         console.log('[UI] Enhanced WASM UI initialized');
+    }
+
+    setupMobilePanels() {
+        const toggleBtn = document.getElementById('mobile-panel-toggle');
+        if (!toggleBtn) return;
+
+        // Check if mobile
+        const checkMobile = () => {
+            this.isMobile = window.innerWidth <= 900;
+            if (this.isMobile) {
+                // Hide all panels initially, show first one
+                this.mobilePanels.forEach((id, index) => {
+                    const panel = document.getElementById(id);
+                    if (panel) {
+                        if (index === this.mobilePanelIndex) {
+                            panel.classList.add('mobile-active');
+                        } else {
+                            panel.classList.remove('mobile-active');
+                        }
+                    }
+                });
+                this.updateMobileToggleBtn();
+            } else {
+                // Show all panels on desktop
+                this.mobilePanels.forEach(id => {
+                    const panel = document.getElementById(id);
+                    if (panel) {
+                        panel.classList.remove('mobile-active');
+                    }
+                });
+            }
+        };
+
+        // Toggle button click
+        toggleBtn.addEventListener('click', () => {
+            this.mobilePanelIndex = (this.mobilePanelIndex + 1) % this.mobilePanels.length;
+            this.mobilePanels.forEach((id, index) => {
+                const panel = document.getElementById(id);
+                if (panel) {
+                    if (index === this.mobilePanelIndex) {
+                        panel.classList.add('mobile-active');
+                    } else {
+                        panel.classList.remove('mobile-active');
+                    }
+                }
+            });
+            this.updateMobileToggleBtn();
+        });
+
+        // Listen for resize
+        window.addEventListener('resize', checkMobile);
+
+        // Initial check
+        checkMobile();
+    }
+
+    updateMobileToggleBtn() {
+        const toggleBtn = document.getElementById('mobile-panel-toggle');
+        if (!toggleBtn) return;
+
+        const panelNames = {
+            'tribe-panel': '🏛️ Tribes',
+            'stats-panel': '📊 Stats',
+            'god-powers-panel': '⚡ Powers',
+            'chart-panel': '📈 Chart',
+            'controls-panel': '🎮 Controls'
+        };
+
+        const currentPanel = this.mobilePanels[this.mobilePanelIndex];
+        toggleBtn.textContent = panelNames[currentPanel] + ' ▼';
     }
 
     initPopulationChart() {
