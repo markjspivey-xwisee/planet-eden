@@ -1,7 +1,13 @@
 // Main WASM module with exports for JavaScript
 // This is the entry point for the WebAssembly module
+// Version: 2 - Added tribe member tracking fix
 
 const std = @import("std");
+
+// Version export to verify WASM is updated
+export fn getVersion() u32 {
+    return 2;
+}
 const math = @import("math.zig");
 const simulation = @import("simulation.zig");
 const organism = @import("organism.zig");
