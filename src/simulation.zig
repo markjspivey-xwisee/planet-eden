@@ -196,9 +196,13 @@ pub const Simulation = struct {
             speed *= 1.0 + outputs[13]; // Up to 2x speed when fleeing
         }
 
-        var vel = move_dir.mul(speed);
-        vel.y = self.organisms.velocities_y[idx] * 0.9;
-        self.organisms.setVelocity(idx, vel);
+        var target_vel = move_dir.mul(speed);
+        target_vel.y = self.organisms.velocities_y[idx] * 0.9;
+
+        // Smooth velocity changes to reduce jerky movement
+        const current_vel = self.organisms.getVelocity(idx);
+        const smoothed_vel = math.Vec3.lerp(current_vel, target_vel, 0.15);
+        self.organisms.setVelocity(idx, smoothed_vel);
 
         // === BASIC ACTIONS (outputs 4-5) ===
         self.organisms.is_eating[idx] = outputs[4] > 0.5;

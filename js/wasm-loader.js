@@ -126,8 +126,37 @@ export class WasmModule {
                 this.memory.buffer,
                 this.exports.getEatingFlags(),
                 count
-            )
+            ),
+            velocitiesX: this.exports.getVelocitiesX ? new Float32Array(
+                this.memory.buffer,
+                this.exports.getVelocitiesX(),
+                count
+            ) : null,
+            velocitiesY: this.exports.getVelocitiesY ? new Float32Array(
+                this.memory.buffer,
+                this.exports.getVelocitiesY(),
+                count
+            ) : null,
+            velocitiesZ: this.exports.getVelocitiesZ ? new Float32Array(
+                this.memory.buffer,
+                this.exports.getVelocitiesZ(),
+                count
+            ) : null
         };
+    }
+
+    // Set organism position (for water avoidance corrections)
+    setOrganismPosition(idx, x, y, z) {
+        if (this.exports && this.exports.setOrganismPosition) {
+            this.exports.setOrganismPosition(idx, x, y, z);
+        }
+    }
+
+    // Set organism velocity (for water avoidance push)
+    setOrganismVelocity(idx, vx, vy, vz) {
+        if (this.exports && this.exports.setOrganismVelocity) {
+            this.exports.setOrganismVelocity(idx, vx, vy, vz);
+        }
     }
 
     // Spawn organism (tribeId 0xFFFFFFFF = no tribe)

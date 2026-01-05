@@ -5,8 +5,9 @@
 const std = @import("std");
 
 // Version export to verify WASM is updated
+// Version: 4 - Added velocity smoothing and position/velocity setters for water avoidance
 export fn getVersion() u32 {
-    return 3;
+    return 4;
 }
 const math = @import("math.zig");
 const simulation = @import("simulation.zig");
@@ -199,6 +200,48 @@ export fn getEatingFlags() [*]bool {
         return global_sim.organisms.is_eating.ptr;
     }
     return undefined;
+}
+
+/// Get pointer to velocities X array
+export fn getVelocitiesX() [*]f32 {
+    if (sim_initialized) {
+        return global_sim.organisms.velocities_x.ptr;
+    }
+    return undefined;
+}
+
+/// Get pointer to velocities Y array
+export fn getVelocitiesY() [*]f32 {
+    if (sim_initialized) {
+        return global_sim.organisms.velocities_y.ptr;
+    }
+    return undefined;
+}
+
+/// Get pointer to velocities Z array
+export fn getVelocitiesZ() [*]f32 {
+    if (sim_initialized) {
+        return global_sim.organisms.velocities_z.ptr;
+    }
+    return undefined;
+}
+
+/// Set organism position (used by JS for water avoidance corrections)
+export fn setOrganismPosition(idx: u32, x: f32, y: f32, z: f32) void {
+    if (sim_initialized and idx < global_sim.organisms.count) {
+        global_sim.organisms.positions_x[idx] = x;
+        global_sim.organisms.positions_y[idx] = y;
+        global_sim.organisms.positions_z[idx] = z;
+    }
+}
+
+/// Set organism velocity (used by JS for water avoidance push)
+export fn setOrganismVelocity(idx: u32, vx: f32, vy: f32, vz: f32) void {
+    if (sim_initialized and idx < global_sim.organisms.count) {
+        global_sim.organisms.velocities_x[idx] = vx;
+        global_sim.organisms.velocities_y[idx] = vy;
+        global_sim.organisms.velocities_z[idx] = vz;
+    }
 }
 
 // Tribe data access

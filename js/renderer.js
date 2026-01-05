@@ -1969,32 +1969,86 @@ export class Renderer {
             // Get terrain info at this position
             let { position, quaternion, isLand } = this.positionOnPlanetSurface(flatX, flatZ, objectHeight);
 
-            // Soft water avoidance for non-plants: gently push toward land
-            if (!isLand && orgType !== 0) {
-                // Find nearest land direction by sampling nearby positions
-                let bestLandDir = null;
-                let bestLandDist = Infinity;
+            // Water avoidance for non-plants: prevent organisms from entering water
+            if (orgType !== 0) {
+                let needsPositionUpdate = false;
 
-                for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 4) {
-                    for (let radius = 3; radius <= 15; radius += 3) {
-                        const testX = flatX + Math.cos(angle) * radius;
-                        const testZ = flatZ + Math.sin(angle) * radius;
-                        const testInfo = this.positionOnPlanetSurface(testX, testZ);
-                        if (testInfo.isLand && radius < bestLandDist) {
-                            bestLandDist = radius;
-                            bestLandDir = { x: testX - flatX, z: testZ - flatZ };
+                // If in water, strongly push toward land
+                if (!isLand) {
+                    let bestLandDir = null;
+                    let bestLandDist = Infinity;
+
+                    for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 4) {
+                        for (let radius = 2; radius <= 20; radius += 2) {
+                            const testX = flatX + Math.cos(angle) * radius;
+                            const testZ = flatZ + Math.sin(angle) * radius;
+                            const testInfo = this.positionOnPlanetSurface(testX, testZ);
+                            if (testInfo.isLand && radius < bestLandDist) {
+                                bestLandDist = radius;
+                                bestLandDir = { x: testX - flatX, z: testZ - flatZ };
+                            }
+                        }
+                    }
+
+                    if (bestLandDir) {
+                        const pushStrength = 1.5; // Strong push to get out of water quickly
+                        const len = Math.sqrt(bestLandDir.x ** 2 + bestLandDir.z ** 2);
+                        flatX += (bestLandDir.x / len) * pushStrength;
+                        flatZ += (bestLandDir.z / len) * pushStrength;
+                        needsPositionUpdate = true;
+                    }
+                } else {
+                    // On land - check if moving toward water and redirect
+                    if (data.velocitiesX && data.velocitiesZ) {
+                        const vx = data.velocitiesX[i] || 0;
+                        const vz = data.velocitiesZ[i] || 0;
+                        const speed = Math.sqrt(vx * vx + vz * vz);
+
+                        if (speed > 0.1) {
+                            // Check position ahead based on velocity
+                            const lookAhead = 3.0; // How far ahead to check
+                            const futureX = flatX + (vx / speed) * lookAhead;
+                            const futureZ = flatZ + (vz / speed) * lookAhead;
+                            const futureInfo = this.positionOnPlanetSurface(futureX, futureZ);
+
+                            // If heading toward water, redirect velocity
+                            if (!futureInfo.isLand) {
+                                // Find a safe direction to redirect to
+                                let bestSafeDir = null;
+                                let bestAngleDiff = Infinity;
+                                const currentAngle = Math.atan2(vz, vx);
+
+                                for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 8) {
+                                    const testX = flatX + Math.cos(angle) * lookAhead;
+                                    const testZ = flatZ + Math.sin(angle) * lookAhead;
+                                    const testInfo = this.positionOnPlanetSurface(testX, testZ);
+
+                                    if (testInfo.isLand) {
+                                        // Prefer directions closest to original heading
+                                        let angleDiff = Math.abs(angle - currentAngle);
+                                        if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
+                                        if (angleDiff < bestAngleDiff) {
+                                            bestAngleDiff = angleDiff;
+                                            bestSafeDir = { x: Math.cos(angle), z: Math.sin(angle) };
+                                        }
+                                    }
+                                }
+
+                                // Redirect velocity toward safe direction
+                                if (bestSafeDir && this.wasmModule.setOrganismVelocity) {
+                                    const newVx = bestSafeDir.x * speed;
+                                    const newVz = bestSafeDir.z * speed;
+                                    this.wasmModule.setOrganismVelocity(i, newVx, 0, newVz);
+                                }
+                            }
                         }
                     }
                 }
 
-                // Apply gentle push toward nearest land
-                if (bestLandDir) {
-                    const pushStrength = 0.3; // Gentle push per frame
-                    const len = Math.sqrt(bestLandDir.x ** 2 + bestLandDir.z ** 2);
-                    flatX += (bestLandDir.x / len) * pushStrength;
-                    flatZ += (bestLandDir.z / len) * pushStrength;
-                    // Recalculate position with adjusted coordinates
-                    const adjusted = this.positionOnPlanetSurface(flatX, flatZ);
+                // Write corrected position back to WASM
+                if (needsPositionUpdate && this.wasmModule.setOrganismPosition) {
+                    this.wasmModule.setOrganismPosition(i, flatX, data.positionsY[i], flatZ);
+                    const adjusted = this.positionOnPlanetSurface(flatX, flatZ, objectHeight);
                     position = adjusted.position;
                     quaternion = adjusted.quaternion;
                 }
@@ -2002,7 +2056,7 @@ export class Renderer {
 
             // Smooth position interpolation to prevent jerky movement
             if (mesh.userData.hasPosition) {
-                const lerpFactor = 0.2; // Smooth but responsive
+                const lerpFactor = 0.15; // Smooth interpolation (lower = smoother but more lag)
                 mesh.position.lerp(position, lerpFactor);
             } else {
                 mesh.position.copy(position);
