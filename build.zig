@@ -1,12 +1,15 @@
 const std = @import("std");
 
 pub fn build(b: *std.Build) void {
-    // Target WebAssembly for browser
-    const target = b.resolveTargetQuery(.{
+    // Target WebAssembly for browser with SIMD128 support
+    var target_query: std.Target.Query = .{
         .cpu_arch = .wasm32,
         .os_tag = .freestanding,
         .abi = .none,
-    });
+    };
+    // Enable SIMD128 for performance (supported in all modern browsers since 2021)
+    target_query.cpu_features_add = std.Target.wasm.featureSet(&.{.simd128});
+    const target = b.resolveTargetQuery(target_query);
 
     // Optimize for small binary size
     const optimize = b.standardOptimizeOption(.{
@@ -27,12 +30,6 @@ pub fn build(b: *std.Build) void {
     wasm.initial_memory = 65536 * 256; // 16 MB initial memory (256 pages)
     wasm.max_memory = 65536 * 2048; // 128 MB max memory
     wasm.stack_size = 65536 * 2; // 128KB stack
-
-    // SIMD disabled for compatibility
-    // const simd_feature = std.Target.wasm.Feature.simd128;
-    // var enabled_features = std.Target.Cpu.Feature.Set.empty;
-    // enabled_features.addFeature(@intFromEnum(simd_feature));
-    // wasm.root_module.resolved_target.?.result.cpu.features = enabled_features;
 
     b.installArtifact(wasm);
 

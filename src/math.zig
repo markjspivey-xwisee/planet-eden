@@ -120,22 +120,104 @@ pub const Rng = struct {
     }
 };
 
-// SIMD-optimized batch operations (when SIMD is available)
+// SIMD types for vectorized operations
+pub const Vec4f = @Vector(4, f32);
+
+/// SIMD-optimized batch add (processes 4 floats at a time)
 pub fn addBatch(a: []const f32, b: []const f32, result: []f32) void {
     std.debug.assert(a.len == b.len and b.len == result.len);
 
-    // TODO: Use @Vector when SIMD is available
-    // For now, simple loop (compiler will auto-vectorize)
-    for (a, b, result) |av, bv, *rv| {
-        rv.* = av + bv;
+    const len = a.len;
+    const simd_len = len / 4 * 4;
+
+    // Process 4 elements at a time using SIMD
+    var i: usize = 0;
+    while (i < simd_len) : (i += 4) {
+        const va: Vec4f = a[i..][0..4].*;
+        const vb: Vec4f = b[i..][0..4].*;
+        result[i..][0..4].* = va + vb;
+    }
+
+    // Handle remaining elements
+    while (i < len) : (i += 1) {
+        result[i] = a[i] + b[i];
     }
 }
 
+/// SIMD-optimized batch multiply by scalar
 pub fn mulBatch(a: []const f32, scalar: f32, result: []f32) void {
     std.debug.assert(a.len == result.len);
 
-    for (a, result) |av, *rv| {
-        rv.* = av * scalar;
+    const len = a.len;
+    const simd_len = len / 4 * 4;
+    const scalar_vec: Vec4f = @splat(scalar);
+
+    // Process 4 elements at a time using SIMD
+    var i: usize = 0;
+    while (i < simd_len) : (i += 4) {
+        const va: Vec4f = a[i..][0..4].*;
+        result[i..][0..4].* = va * scalar_vec;
+    }
+
+    // Handle remaining elements
+    while (i < len) : (i += 1) {
+        result[i] = a[i] * scalar;
+    }
+}
+
+/// SIMD-optimized dot product for neural network weights
+pub fn dotProductSimd(a: []const f32, b: []const f32) f32 {
+    std.debug.assert(a.len == b.len);
+
+    const len = a.len;
+    const simd_len = len / 4 * 4;
+
+    var sum_vec: Vec4f = @splat(0.0);
+
+    // Process 4 elements at a time
+    var i: usize = 0;
+    while (i < simd_len) : (i += 4) {
+        const va: Vec4f = a[i..][0..4].*;
+        const vb: Vec4f = b[i..][0..4].*;
+        sum_vec += va * vb;
+    }
+
+    // Reduce SIMD vector to scalar
+    var sum = @reduce(.Add, sum_vec);
+
+    // Handle remaining elements
+    while (i < len) : (i += 1) {
+        sum += a[i] * b[i];
+    }
+
+    return sum;
+}
+
+/// SIMD-optimized tanh for neural network activation (processes 4 values)
+pub fn tanhSimd(values: []f32) void {
+    const len = values.len;
+    const simd_len = len / 4 * 4;
+
+    const one: Vec4f = @splat(1.0);
+    const third: Vec4f = @splat(1.0 / 3.0);
+    const fifteenth: Vec4f = @splat(1.0 / 15.0);
+
+    var i: usize = 0;
+    while (i < simd_len) : (i += 4) {
+        const x: Vec4f = values[i..][0..4].*;
+        const x2 = x * x;
+        const x3 = x2 * x;
+        const x4 = x2 * x2;
+
+        // Pade approximation: tanh(x) ≈ (x + x^3/3) / (1 + x^2/3 + x^4/15)
+        const numerator = x + x3 * third;
+        const denominator = one + x2 * third + x4 * fifteenth;
+        values[i..][0..4].* = numerator / denominator;
+    }
+
+    // Handle remaining elements
+    while (i < len) : (i += 1) {
+        values[i] = tanhFast(values[i]);
     }
 }
 

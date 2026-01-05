@@ -5,9 +5,9 @@
 const std = @import("std");
 
 // Version export to verify WASM is updated
-// Version: 5 - Increased MAX_TRIBES to 8, unique buildings
+// Version: 6 - SIMD enabled, mobile hide button
 export fn getVersion() u32 {
-    return 5;
+    return 6;
 }
 
 const tribe = @import("tribe.zig");

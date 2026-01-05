@@ -45,6 +45,7 @@ export class WasmUI {
         this.mobilePanelIndex = 0;
         this.mobilePanels = ['tribe-panel', 'stats-panel', 'god-powers-panel', 'chart-panel', 'controls-panel'];
         this.isMobile = false;
+        this.panelsHidden = false;
     }
 
     init() {
@@ -68,23 +69,34 @@ export class WasmUI {
 
     setupMobilePanels() {
         const toggleBtn = document.getElementById('mobile-panel-toggle');
+        const hideBtn = document.getElementById('mobile-panel-hide');
         if (!toggleBtn) return;
 
-        // Check if mobile
+        // Check if mobile and update panel visibility
         const checkMobile = () => {
             this.isMobile = window.innerWidth <= 900;
             if (this.isMobile) {
-                // Hide all panels initially, show first one
-                this.mobilePanels.forEach((id, index) => {
-                    const panel = document.getElementById(id);
-                    if (panel) {
-                        if (index === this.mobilePanelIndex) {
-                            panel.classList.add('mobile-active');
-                        } else {
+                if (this.panelsHidden) {
+                    // All panels hidden
+                    this.mobilePanels.forEach(id => {
+                        const panel = document.getElementById(id);
+                        if (panel) {
                             panel.classList.remove('mobile-active');
                         }
-                    }
-                });
+                    });
+                } else {
+                    // Show current panel only
+                    this.mobilePanels.forEach((id, index) => {
+                        const panel = document.getElementById(id);
+                        if (panel) {
+                            if (index === this.mobilePanelIndex) {
+                                panel.classList.add('mobile-active');
+                            } else {
+                                panel.classList.remove('mobile-active');
+                            }
+                        }
+                    });
+                }
                 this.updateMobileToggleBtn();
             } else {
                 // Show all panels on desktop
@@ -97,9 +109,16 @@ export class WasmUI {
             }
         };
 
-        // Toggle button click
+        // Toggle button click - cycle through panels
         toggleBtn.addEventListener('click', () => {
-            this.mobilePanelIndex = (this.mobilePanelIndex + 1) % this.mobilePanels.length;
+            if (this.panelsHidden) {
+                // If hidden, show panels first
+                this.panelsHidden = false;
+                hideBtn?.classList.remove('panels-hidden');
+            } else {
+                // Cycle to next panel
+                this.mobilePanelIndex = (this.mobilePanelIndex + 1) % this.mobilePanels.length;
+            }
             this.mobilePanels.forEach((id, index) => {
                 const panel = document.getElementById(id);
                 if (panel) {
@@ -113,6 +132,32 @@ export class WasmUI {
             this.updateMobileToggleBtn();
         });
 
+        // Hide button click - toggle all panels off/on
+        if (hideBtn) {
+            hideBtn.addEventListener('click', () => {
+                this.panelsHidden = !this.panelsHidden;
+                hideBtn.classList.toggle('panels-hidden', this.panelsHidden);
+                hideBtn.textContent = this.panelsHidden ? '👁️' : '✕';
+
+                if (this.panelsHidden) {
+                    // Hide all panels
+                    this.mobilePanels.forEach(id => {
+                        const panel = document.getElementById(id);
+                        if (panel) {
+                            panel.classList.remove('mobile-active');
+                        }
+                    });
+                } else {
+                    // Show current panel
+                    const panel = document.getElementById(this.mobilePanels[this.mobilePanelIndex]);
+                    if (panel) {
+                        panel.classList.add('mobile-active');
+                    }
+                }
+                this.updateMobileToggleBtn();
+            });
+        }
+
         // Listen for resize
         window.addEventListener('resize', checkMobile);
 
@@ -123,6 +168,11 @@ export class WasmUI {
     updateMobileToggleBtn() {
         const toggleBtn = document.getElementById('mobile-panel-toggle');
         if (!toggleBtn) return;
+
+        if (this.panelsHidden) {
+            toggleBtn.textContent = '📊 Show Panels';
+            return;
+        }
 
         const panelNames = {
             'tribe-panel': '🏛️ Tribes',
