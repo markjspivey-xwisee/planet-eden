@@ -42,6 +42,12 @@ export class WasmModule {
             return false;
         }
 
+        // Check WASM version
+        if (this.exports.getVersion) {
+            const version = this.exports.getVersion();
+            console.log(`[WASM] Module version: ${version}`);
+        }
+
         const success = this.exports.init(maxOrganisms, seed);
         if (success) {
             console.log(`[WASM] Simulation initialized with ${maxOrganisms} max organisms, seed: ${seed}`);
