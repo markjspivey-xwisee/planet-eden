@@ -1,12 +1,12 @@
 // Main WASM module with exports for JavaScript
 // This is the entry point for the WebAssembly module
-// Version: 2 - Added tribe member tracking fix
+// Version: 3 - Full NN outputs (building, messaging, reproduce, flee, gather, share, recruit)
 
 const std = @import("std");
 
 // Version export to verify WASM is updated
 export fn getVersion() u32 {
-    return 2;
+    return 3;
 }
 const math = @import("math.zig");
 const simulation = @import("simulation.zig");

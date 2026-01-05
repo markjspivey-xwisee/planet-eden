@@ -121,6 +121,9 @@ pub const Simulation = struct {
         const pos = self.organisms.getPosition(idx);
         const energy = self.organisms.energies[idx];
         const health = self.organisms.healths[idx];
+        const my_type = @as(organism.OrganismType, @enumFromInt(self.organisms.types[idx]));
+        const tribe_id = self.organisms.tribe_ids[idx];
+        const has_tribe = tribe_id < self.tribes.count;
 
         // Normalize inputs
         inputs[0] = energy / 100.0;
@@ -143,7 +146,6 @@ pub const Simulation = struct {
             if (!self.organisms.alive[other_idx]) continue;
 
             const other_type = @as(organism.OrganismType, @enumFromInt(self.organisms.types[other_idx]));
-            const my_type = @as(organism.OrganismType, @enumFromInt(self.organisms.types[idx]));
 
             if (my_type == .herbivore and other_type == .plant) {
                 food_count += 1;
@@ -151,7 +153,7 @@ pub const Simulation = struct {
                 food_count += 1;
             } else if (other_type == .carnivore and my_type != .carnivore) {
                 threat_count += 1;
-            } else if (self.organisms.tribe_ids[other_idx] == self.organisms.tribe_ids[idx]) {
+            } else if (self.organisms.tribe_ids[other_idx] == tribe_id and has_tribe) {
                 ally_count += 1;
             }
         }
@@ -170,26 +172,149 @@ pub const Simulation = struct {
         // Run neural network
         brain.predict(&inputs, &outputs, &hidden);
 
-        // Apply outputs
+        // =====================================================
+        // Apply outputs (17 total)
+        // =====================================================
         // outputs[0-2] = movement direction
         // outputs[3] = speed multiplier
         // outputs[4] = eat action
         // outputs[5] = attack action
-        // outputs[6-8] = build location
-        // outputs[9-11] = message symbols
-        // outputs[12-16] = other actions
+        // outputs[6-8] = build (trigger, type, distance)
+        // outputs[9-11] = message (trigger, symbol1, symbol2)
+        // outputs[12] = reproduce
+        // outputs[13] = flee intensity
+        // outputs[14] = gather resources
+        // outputs[15] = share with tribe
+        // outputs[16] = recruit/call allies
 
+        // === MOVEMENT (outputs 0-3) ===
         const move_dir = math.Vec3.init(outputs[0], 0, outputs[2]).normalize();
-        const speed = math.clamp(outputs[3], 0, 1) * 5.0;
+        var speed = math.clamp(outputs[3], 0, 1) * 5.0;
+
+        // Flee behavior (output 13) - boost speed away from threats
+        if (outputs[13] > 0.3 and threat_count > 0) {
+            speed *= 1.0 + outputs[13]; // Up to 2x speed when fleeing
+        }
 
         var vel = move_dir.mul(speed);
-        vel.y = self.organisms.velocities_y[idx] * 0.9; // Preserve some vertical velocity
-
+        vel.y = self.organisms.velocities_y[idx] * 0.9;
         self.organisms.setVelocity(idx, vel);
 
-        // Actions
+        // === BASIC ACTIONS (outputs 4-5) ===
         self.organisms.is_eating[idx] = outputs[4] > 0.5;
         self.organisms.is_attacking[idx] = outputs[5] > 0.5;
+
+        // === BUILDING (outputs 6-8) ===
+        // Only humanoids with tribes can build
+        if (outputs[6] > 0.7 and has_tribe and my_type == .humanoid) {
+            // Map output[7] to building type (0-9)
+            const building_type_idx = @as(u8, @intFromFloat(math.clamp((outputs[7] + 1.0) * 5.0, 0, 9)));
+            const building_type = @as(building.BuildingType, @enumFromInt(building_type_idx));
+
+            // Build at offset from current position
+            const build_offset = (outputs[8] + 1.0) * 3.0; // 0-6 units away
+            const build_pos = math.Vec3.init(
+                pos.x + move_dir.x * build_offset,
+                pos.y,
+                pos.z + move_dir.z * build_offset,
+            );
+
+            // Try to create building (may fail due to resources/capacity)
+            _ = self.buildings.create(building_type, tribe_id, build_pos, &self.tribes) catch {};
+        }
+
+        // === MESSAGING (outputs 9-11) ===
+        if (outputs[9] > 0.5) {
+            // Map outputs to symbol indices (0-29)
+            const symbol1_idx = @as(u8, @intFromFloat(math.clamp((outputs[10] + 1.0) * 15.0, 0, 29)));
+            const symbol2_idx = @as(u8, @intFromFloat(math.clamp((outputs[11] + 1.0) * 15.0, 0, 29)));
+
+            const symbol1 = @as(message.Symbol, @enumFromInt(symbol1_idx));
+            const symbol2 = @as(message.Symbol, @enumFromInt(symbol2_idx));
+
+            // Send message to nearby organisms (receiver 0 = broadcast)
+            self.messages.sendPair(@intCast(idx), 0, symbol1, symbol2) catch {};
+        }
+
+        // === REPRODUCTION (output 12) ===
+        if (outputs[12] > 0.7 and self.organisms.reproduction_cooldowns[idx] <= 0) {
+            // Need enough energy to reproduce
+            if (energy > 60.0 and self.organisms.count < self.organisms.capacity) {
+                // Find nearby ally of same type for reproduction
+                for (nearby[0..nearby_count]) |other_idx| {
+                    if (other_idx == idx) continue;
+                    if (!self.organisms.alive[other_idx]) continue;
+
+                    const other_type = @as(organism.OrganismType, @enumFromInt(self.organisms.types[other_idx]));
+                    if (other_type != my_type) continue;
+
+                    // Same tribe or both tribeless
+                    const other_tribe = self.organisms.tribe_ids[other_idx];
+                    if (has_tribe and other_tribe != tribe_id) continue;
+
+                    // Spawn offspring near parent
+                    const offspring_pos = math.Vec3.init(
+                        pos.x + self.rng.range(-2, 2),
+                        pos.y,
+                        pos.z + self.rng.range(-2, 2),
+                    );
+
+                    _ = self.spawnOrganism(my_type, offspring_pos, tribe_id) catch {};
+
+                    // Cost energy and set cooldown
+                    self.organisms.energies[idx] -= 30.0;
+                    self.organisms.reproduction_cooldowns[idx] = 60.0; // 60 second cooldown
+                    break;
+                }
+            }
+        }
+
+        // === GATHER RESOURCES (output 14) ===
+        // Humanoids can gather resources for their tribe
+        if (outputs[14] > 0.5 and has_tribe and my_type == .humanoid) {
+            if (self.tribes.getTribe(tribe_id)) |t| {
+                // Passive resource gathering based on output strength
+                const gather_rate = (outputs[14] + 1.0) * 0.05;
+                t.food += gather_rate;
+                t.wood += gather_rate * 0.5;
+            }
+        }
+
+        // === SHARE WITH TRIBE (output 15) ===
+        if (outputs[15] > 0.6 and has_tribe and energy > 50.0) {
+            if (self.tribes.getTribe(tribe_id)) |t| {
+                const share_amount: f32 = 2.0;
+                self.organisms.energies[idx] -= share_amount;
+                t.food += share_amount;
+            }
+        }
+
+        // === RECRUIT (output 16) ===
+        // Try to recruit nearby tribeless humanoids
+        if (outputs[16] > 0.6 and has_tribe and my_type == .humanoid) {
+            for (nearby[0..nearby_count]) |other_idx| {
+                if (other_idx == idx) continue;
+                if (!self.organisms.alive[other_idx]) continue;
+
+                const other_type = @as(organism.OrganismType, @enumFromInt(self.organisms.types[other_idx]));
+                if (other_type != .humanoid) continue;
+
+                // Only recruit tribeless (tribe_id >= tribes.count means no tribe)
+                if (self.organisms.tribe_ids[other_idx] < self.tribes.count) continue;
+
+                // Recruit to our tribe
+                self.organisms.tribe_ids[other_idx] = tribe_id;
+                if (self.tribes.getTribe(tribe_id)) |t| {
+                    _ = t.addMember(@intCast(other_idx));
+                }
+                break; // Only recruit one at a time
+            }
+        }
+
+        // Update reproduction cooldown (decrease by frame time ~0.016s)
+        if (self.organisms.reproduction_cooldowns[idx] > 0) {
+            self.organisms.reproduction_cooldowns[idx] -= 0.016;
+        }
     }
 
     /// Update all tribes
