@@ -552,25 +552,11 @@ export class HUD {
                 }
             }
 
-            /* ===== Hide old UI elements ===== */
-            #loading,
-            #fps-counter,
-            #time-display,
-            #weather-display,
-            #keyboard-hints,
-            #tribe-panel,
-            #stats-panel,
-            #god-powers-panel,
-            #controls-panel,
-            #chart-panel,
+            /* ===== Hide dynamically created old UI elements ===== */
             #save-load-buttons,
             #audio-toggle,
             #screenshot-btn,
-            #sparkline-container,
-            #achievement-toast,
-            .mobile-panel-toggle,
-            .mobile-panel-hide,
-            .title {
+            #sparkline-container {
                 display: none !important;
             }
         `;

@@ -50,17 +50,24 @@ export class WasmUI {
     }
 
     init() {
-        // Setup FPS counter
+        // Setup FPS counter (may not exist if using new HUD)
         this.fpsElement = document.getElementById('fps-counter');
 
-        // Initialize population chart
-        this.initPopulationChart();
+        // Initialize population chart (skip if element doesn't exist)
+        const chartCanvas = document.getElementById('population-chart');
+        if (chartCanvas) {
+            this.initPopulationChart();
+        }
 
-        // Setup control event listeners
-        this.setupControls();
+        // Setup control event listeners (skip if elements don't exist)
+        if (document.getElementById('time-scale-slider')) {
+            this.setupControls();
+        }
 
-        // Setup god powers
-        this.setupGodPowers();
+        // Setup god powers (skip if elements don't exist)
+        if (document.getElementById('btn-spawn-tribe')) {
+            this.setupGodPowers();
+        }
 
         // Setup mobile panel toggle
         this.setupMobilePanels();
@@ -501,25 +508,28 @@ export class WasmUI {
             this.frameCount = 0;
             this.lastFpsUpdate = now;
 
-            // Color code FPS
-            if (this.fps >= 55) {
-                this.fpsElement.style.color = '#0F0';
-                this.fpsElement.style.borderColor = '#0F0';
-            } else if (this.fps >= 30) {
-                this.fpsElement.style.color = '#FF0';
-                this.fpsElement.style.borderColor = '#FF0';
-            } else {
-                this.fpsElement.style.color = '#F00';
-                this.fpsElement.style.borderColor = '#F00';
+            // Color code FPS (only if element exists)
+            if (this.fpsElement) {
+                if (this.fps >= 55) {
+                    this.fpsElement.style.color = '#0F0';
+                    this.fpsElement.style.borderColor = '#0F0';
+                } else if (this.fps >= 30) {
+                    this.fpsElement.style.color = '#FF0';
+                    this.fpsElement.style.borderColor = '#FF0';
+                } else {
+                    this.fpsElement.style.color = '#F00';
+                    this.fpsElement.style.borderColor = '#F00';
+                }
+                this.fpsElement.textContent = `${this.fps} FPS`;
             }
         }
-
-        this.fpsElement.textContent = `${this.fps} FPS`;
     }
 
     updateStats() {
-        const stats = this.wasmModule.getStats();
+        const statsContent = document.getElementById('stats-content');
+        if (!statsContent) return; // Skip if using new HUD
 
+        const stats = this.wasmModule.getStats();
         if (!stats) return;
 
         // Get organism counts by type
@@ -555,12 +565,14 @@ export class WasmUI {
             </div>
         `;
 
-        document.getElementById('stats-content').innerHTML = statsHTML;
+        statsContent.innerHTML = statsHTML;
     }
 
     updateTribes() {
-        const tribes = this.wasmModule.getAllTribes();
         const tribeListElement = document.getElementById('tribe-list');
+        if (!tribeListElement) return; // Skip if using new HUD
+
+        const tribes = this.wasmModule.getAllTribes();
 
         // Enhanced debug logging
         const stats = this.wasmModule.getStats();
@@ -744,6 +756,12 @@ export class WasmUI {
 
     showAchievement(name, description) {
         const toast = document.getElementById('achievement-toast');
+        if (!toast) {
+            // Log achievement to console if no toast element
+            console.log(`🏆 Achievement Unlocked: ${name} - ${description}`);
+            return;
+        }
+
         toast.innerHTML = `
             <div style="font-size: 24px; margin-bottom: 8px;">🏆 Achievement Unlocked!</div>
             <div style="font-size: 18px;">${name}</div>
