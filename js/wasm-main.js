@@ -4,6 +4,14 @@ import { WasmModule, OrganismType } from './wasm-loader.js';
 import { Renderer } from './renderer.js';
 import { WasmUI } from './wasm-ui.js';
 
+// New feature systems
+import { eventSystem } from './engine/events.js';
+import { audioSystem } from './engine/audio.js';
+import { ParticleSystem } from './engine/particles.js';
+import { goalSystem } from './engine/goals.js';
+import { ScreenshotSystem } from './engine/screenshot.js';
+import { sparklineGraph, SparklineGraph } from './engine/sparkline.js';
+
 class PlanetEdenWasm {
     constructor() {
         this.wasmModule = new WasmModule();
@@ -14,6 +22,14 @@ class PlanetEdenWasm {
         this.timeScale = 1.0;
         this.loadingElement = null;
         this.pauseOverlay = null;
+
+        // Feature systems
+        this.eventSystem = eventSystem;
+        this.audioSystem = audioSystem;
+        this.particleSystem = null;
+        this.goalSystem = goalSystem;
+        this.screenshotSystem = null;
+        this.sparkline = sparklineGraph;
     }
 
     async init() {
@@ -53,6 +69,31 @@ class PlanetEdenWasm {
         this.ui = new WasmUI(this.wasmModule, this.renderer);
         this.ui.init();
         console.log('[Planet Eden WASM] ✅ UI initialized');
+
+        // Initialize feature systems
+        console.log('[Planet Eden WASM] Initializing feature systems...');
+
+        // Event/Toast system
+        this.eventSystem.init();
+
+        // Audio system (user must click to enable due to browser policy)
+        this.audioSystem.init();
+
+        // Particle system (needs Three.js scene)
+        this.particleSystem = new ParticleSystem(this.renderer.scene);
+        this.particleSystem.init();
+
+        // Goals/Milestones system
+        this.goalSystem.init(this.eventSystem, this.audioSystem);
+
+        // Screenshot system
+        this.screenshotSystem = new ScreenshotSystem(this.renderer);
+        this.screenshotSystem.init();
+
+        // Population sparkline graph
+        this.sparkline.init();
+
+        console.log('[Planet Eden WASM] ✅ Feature systems initialized');
 
         // Setup pause overlay
         this.pauseOverlay = document.getElementById('pause-overlay');
@@ -215,6 +256,15 @@ class PlanetEdenWasm {
                 case 'I':
                     this.logDebugInfo();
                     break;
+
+                // Follow selected creature
+                case 'c':
+                case 'C':
+                    this.renderer.toggleFollowMode();
+                    break;
+
+                // Note: L, M, P, G are handled by their respective systems
+                // L = Event log, M = Mute/Audio, P = Screenshot, G = Graph
             }
         });
 
@@ -247,8 +297,13 @@ class PlanetEdenWasm {
         console.log('  F5          - Plague');
         console.log('  F6          - Divine blessing');
         console.log('');
-        console.log('📊 DEBUG');
+        console.log('📊 DEBUG & TOOLS');
         console.log('  I           - Log debug info');
+        console.log('  C           - Follow selected creature');
+        console.log('  L           - Toggle event log');
+        console.log('  M           - Toggle audio');
+        console.log('  P           - Take screenshot');
+        console.log('  G           - Toggle population graph');
         console.log('');
         console.log('═══════════════════════════════════════════════════');
         console.log('');
@@ -306,6 +361,19 @@ class PlanetEdenWasm {
             // Update simulation with time scaling
             const adjustedDelta = delta * this.timeScale;
             this.wasmModule.update(adjustedDelta);
+
+            // Update particle system
+            if (this.particleSystem) {
+                this.particleSystem.update(adjustedDelta);
+            }
+
+            // Check goals/milestones
+            const stats = this.wasmModule.getStats();
+            const typeCounts = SparklineGraph.countTypes(this.wasmModule);
+            this.goalSystem.check(stats, { tribalHumanoids: typeCounts.humanoids });
+
+            // Update population sparkline
+            this.sparkline.sample(stats, typeCounts);
         }
 
         // Always update renderer and UI

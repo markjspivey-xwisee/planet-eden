@@ -25,6 +25,12 @@ export class Renderer {
         // Previous positions for movement direction
         this.previousPositions = new Map();
 
+        // Follow mode for camera
+        this.followMode = false;
+        this.followTarget = null;
+        this.followOffset = new THREE.Vector3(0, 10, 20); // Camera offset from target
+        this.followLerp = 0.05; // Smoothing factor
+
         // Activity tracking for humanoids
         this.humanoidActivities = new Map(); // id -> { activity, target, progress, effects }
         this.activityEffects = new Map(); // id -> THREE.Group (particle effects)
@@ -3596,6 +3602,35 @@ export class Renderer {
             this.selectionRing.material.opacity = 0.5 + Math.sin(Date.now() * 0.003) * 0.3;
         }
 
+        // Follow mode camera
+        if (this.followMode && this.followTarget) {
+            const mesh = this.organisms.get(this.followTarget);
+            if (mesh) {
+                // Get world position of the target
+                const targetPos = new THREE.Vector3();
+                mesh.getWorldPosition(targetPos);
+
+                // Calculate camera position offset from target
+                const up = targetPos.clone().normalize();
+                const forward = new THREE.Vector3(1, 0, 0).cross(up).normalize();
+                const right = up.clone().cross(forward);
+
+                // Position camera behind and above the creature
+                const cameraTarget = targetPos.clone()
+                    .add(up.clone().multiplyScalar(this.followOffset.y))
+                    .add(forward.clone().multiplyScalar(-this.followOffset.z));
+
+                // Smooth camera movement
+                this.camera.position.lerp(cameraTarget, this.followLerp);
+
+                // Look at the creature
+                this.controls.target.lerp(targetPos, this.followLerp);
+            } else {
+                // Target lost, exit follow mode
+                this.exitFollowMode();
+            }
+        }
+
         // Update controls
         this.controls.update();
 
@@ -3654,5 +3689,89 @@ export class Renderer {
 
     setTimeScale(scale) {
         // Could affect animation speeds if needed
+    }
+
+    // Follow mode - track a selected creature with the camera
+    toggleFollowMode() {
+        if (this.followMode) {
+            this.exitFollowMode();
+        } else if (this.selectedOrganism !== null) {
+            this.enterFollowMode(this.selectedOrganism);
+        } else {
+            console.log('[Renderer] Select a creature first (click on it), then press C to follow');
+        }
+    }
+
+    enterFollowMode(targetId) {
+        const mesh = this.organisms.get(targetId);
+        if (!mesh) {
+            console.log('[Renderer] Target not found');
+            return;
+        }
+
+        this.followMode = true;
+        this.followTarget = targetId;
+        this.controls.enableDamping = false; // Disable for smoother follow
+
+        // Show follow indicator
+        this.showFollowIndicator(true);
+
+        console.log(`[Renderer] Following creature ${targetId}`);
+    }
+
+    exitFollowMode() {
+        this.followMode = false;
+        this.followTarget = null;
+        this.controls.enableDamping = true;
+
+        // Hide follow indicator
+        this.showFollowIndicator(false);
+
+        console.log('[Renderer] Exited follow mode');
+    }
+
+    showFollowIndicator(show) {
+        let indicator = document.getElementById('follow-indicator');
+        if (show) {
+            if (!indicator) {
+                indicator = document.createElement('div');
+                indicator.id = 'follow-indicator';
+                indicator.style.cssText = `
+                    position: fixed;
+                    top: 70px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    background: rgba(0, 0, 0, 0.8);
+                    border: 1px solid #4a0;
+                    border-radius: 20px;
+                    padding: 8px 20px;
+                    color: #8f8;
+                    font-family: 'Segoe UI', sans-serif;
+                    font-size: 14px;
+                    z-index: 1000;
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                `;
+                indicator.innerHTML = '<span style="animation: pulse 1s infinite;">👁️</span> Following creature <span style="color: #666;">(C to stop)</span>';
+                document.body.appendChild(indicator);
+
+                // Add pulse animation if not exists
+                if (!document.getElementById('follow-style')) {
+                    const style = document.createElement('style');
+                    style.id = 'follow-style';
+                    style.textContent = `
+                        @keyframes pulse {
+                            0%, 100% { opacity: 1; }
+                            50% { opacity: 0.5; }
+                        }
+                    `;
+                    document.head.appendChild(style);
+                }
+            }
+            indicator.style.display = 'flex';
+        } else if (indicator) {
+            indicator.style.display = 'none';
+        }
     }
 }
