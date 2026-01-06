@@ -1,0 +1,25 @@
+# Build cache (not output - WASM is tracked)
+.zig-cache/
+
+# Zig compiler (local installation)
+zig/
+
+# IDE and editor settings
+.claude/
+.vscode/
+
+# Logs
+*.log
+server.log
+
+# OS artifacts
+nul
+.DS_Store
+Thumbs.db
+
+# Node
+node_modules/
+
+# Local development
+*.local
+*.local.*
