@@ -15,6 +15,7 @@ const SUN_ORBIT_RADIUS = 300;
 export class Renderer {
     constructor(wasmModule) {
         this.wasmModule = wasmModule;
+        this.frameCount = 0; // For staggered updates (performance optimization)
         this.organisms = new Map(); // id -> THREE.Mesh
         this.buildings = new Map(); // id -> THREE.Mesh
         this.resources = new Map(); // id -> { mesh, type, amount }
@@ -1896,6 +1897,8 @@ export class Renderer {
     }
 
     update() {
+        this.frameCount++; // Increment for staggered updates
+
         // Get organism data from WASM
         const data = this.wasmModule.getOrganismData();
         if (!data) return;
@@ -1975,78 +1978,37 @@ export class Renderer {
                 continue;
             }
 
-            // Water avoidance for non-plants: prevent organisms from entering water
-            if (orgType !== 0) {
+            // Water avoidance for non-plants (OPTIMIZED: staggered checks to reduce CPU load)
+            // Only check 1/10th of organisms each frame to spread the load
+            if (orgType !== 0 && (this.frameCount % 10 === i % 10)) {
                 let needsPositionUpdate = false;
 
-                // If in water, strongly push toward land
+                // If in water, push toward center (simple heuristic - land is usually toward center)
                 if (!isLand) {
-                    let bestLandDir = null;
-                    let bestLandDist = Infinity;
-
-                    for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 4) {
-                        for (let radius = 2; radius <= 20; radius += 2) {
-                            const testX = flatX + Math.cos(angle) * radius;
-                            const testZ = flatZ + Math.sin(angle) * radius;
-                            const testInfo = this.positionOnPlanetSurface(testX, testZ);
-                            if (testInfo.isLand && radius < bestLandDist) {
-                                bestLandDist = radius;
-                                bestLandDir = { x: testX - flatX, z: testZ - flatZ };
-                            }
-                        }
-                    }
-
-                    if (bestLandDir) {
-                        const pushStrength = 1.5; // Strong push to get out of water quickly
-                        const len = Math.sqrt(bestLandDir.x ** 2 + bestLandDir.z ** 2);
-                        flatX += (bestLandDir.x / len) * pushStrength;
-                        flatZ += (bestLandDir.z / len) * pushStrength;
+                    // Simple push toward map center (0,0) which is typically land
+                    const toCenterX = -flatX;
+                    const toCenterZ = -flatZ;
+                    const len = Math.sqrt(toCenterX * toCenterX + toCenterZ * toCenterZ);
+                    if (len > 0.1) {
+                        flatX += (toCenterX / len) * 2.0;
+                        flatZ += (toCenterZ / len) * 2.0;
                         needsPositionUpdate = true;
                     }
-                } else {
-                    // On land - check if moving toward water and redirect
-                    if (data.velocitiesX && data.velocitiesZ) {
-                        const vx = data.velocitiesX[i] || 0;
-                        const vz = data.velocitiesZ[i] || 0;
-                        const speed = Math.sqrt(vx * vx + vz * vz);
+                } else if (data.velocitiesX && data.velocitiesZ) {
+                    // On land - simple forward water check
+                    const vx = data.velocitiesX[i] || 0;
+                    const vz = data.velocitiesZ[i] || 0;
+                    const speed = Math.sqrt(vx * vx + vz * vz);
 
-                        if (speed > 0.1) {
-                            // Check position ahead based on velocity
-                            const lookAhead = 3.0; // How far ahead to check
-                            const futureX = flatX + (vx / speed) * lookAhead;
-                            const futureZ = flatZ + (vz / speed) * lookAhead;
-                            const futureInfo = this.positionOnPlanetSurface(futureX, futureZ);
+                    if (speed > 0.5) {
+                        const lookAhead = 2.0;
+                        const futureX = flatX + (vx / speed) * lookAhead;
+                        const futureZ = flatZ + (vz / speed) * lookAhead;
+                        const futureInfo = this.positionOnPlanetSurface(futureX, futureZ);
 
-                            // If heading toward water, redirect velocity
-                            if (!futureInfo.isLand) {
-                                // Find a safe direction to redirect to
-                                let bestSafeDir = null;
-                                let bestAngleDiff = Infinity;
-                                const currentAngle = Math.atan2(vz, vx);
-
-                                for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 8) {
-                                    const testX = flatX + Math.cos(angle) * lookAhead;
-                                    const testZ = flatZ + Math.sin(angle) * lookAhead;
-                                    const testInfo = this.positionOnPlanetSurface(testX, testZ);
-
-                                    if (testInfo.isLand) {
-                                        // Prefer directions closest to original heading
-                                        let angleDiff = Math.abs(angle - currentAngle);
-                                        if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
-                                        if (angleDiff < bestAngleDiff) {
-                                            bestAngleDiff = angleDiff;
-                                            bestSafeDir = { x: Math.cos(angle), z: Math.sin(angle) };
-                                        }
-                                    }
-                                }
-
-                                // Redirect velocity toward safe direction
-                                if (bestSafeDir && this.wasmModule.setOrganismVelocity) {
-                                    const newVx = bestSafeDir.x * speed;
-                                    const newVz = bestSafeDir.z * speed;
-                                    this.wasmModule.setOrganismVelocity(i, newVx, 0, newVz);
-                                }
-                            }
+                        // If heading toward water, reverse velocity
+                        if (!futureInfo.isLand && this.wasmModule.setOrganismVelocity) {
+                            this.wasmModule.setOrganismVelocity(i, -vx * 0.5, 0, -vz * 0.5);
                         }
                     }
                 }
