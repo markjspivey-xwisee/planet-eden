@@ -452,12 +452,13 @@ export class HUD {
             /* ===== Keyboard Hint ===== */
             .hud-hint {
                 position: fixed;
-                bottom: 80px;
+                bottom: 90px;
                 left: 50%;
                 transform: translateX(-50%);
                 font-size: 11px;
                 color: var(--hud-text-dim);
-                z-index: 999;
+                z-index: 998;
+                pointer-events: none;
             }
 
             .hud-hint kbd {
@@ -560,6 +561,12 @@ export class HUD {
             #stats-panel,
             #god-powers-panel,
             #controls-panel,
+            #chart-panel,
+            #save-load-buttons,
+            #audio-toggle,
+            #screenshot-btn,
+            #sparkline-container,
+            #achievement-toast,
             .mobile-panel-toggle,
             .mobile-panel-hide {
                 display: none !important;
