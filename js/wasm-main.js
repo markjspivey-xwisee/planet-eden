@@ -16,6 +16,7 @@ import { loadingScreen } from './engine/loading.js';
 import { settingsSystem } from './engine/settings.js';
 import { saveSystem } from './engine/savesystem.js';
 import { uiAnimations } from './engine/uianimations.js';
+import { hud } from './engine/hud.js';
 
 class PlanetEdenWasm {
     constructor() {
@@ -40,6 +41,7 @@ class PlanetEdenWasm {
         this.settingsSystem = settingsSystem;
         this.saveSystem = saveSystem;
         this.uiAnimations = uiAnimations;
+        this.hud = hud;
     }
 
     async init() {
@@ -137,6 +139,9 @@ class PlanetEdenWasm {
         // UI Animations
         this.uiAnimations.init();
         this.uiAnimations.setAudioSystem(this.audioSystem);
+
+        // New unified HUD
+        this.hud.init(this.wasmModule, this.renderer, this.audioSystem);
 
         console.log('[Planet Eden WASM] ✅ Feature systems initialized');
 
@@ -237,9 +242,8 @@ class PlanetEdenWasm {
         window.addEventListener('keydown', (e) => {
             switch (e.key) {
                 case ' ':
-                    this.running = !this.running;
-                    this.pauseOverlay.style.display = this.running ? 'none' : 'block';
-                    console.log(`[Planet Eden WASM] ${this.running ? '▶️ STARTED' : '⏸️ PAUSED'}`);
+                    this.togglePause();
+                    this.hud.updatePauseButton();
                     break;
 
                 case 'ArrowLeft':
@@ -482,6 +486,14 @@ class PlanetEdenWasm {
         console.log('[Planet Eden WASM] ▶️ Simulation started!');
     }
 
+    togglePause() {
+        this.running = !this.running;
+        if (this.pauseOverlay) {
+            this.pauseOverlay.style.display = this.running ? 'none' : 'block';
+        }
+        console.log(`[Planet Eden WASM] ${this.running ? '▶️ STARTED' : '⏸️ PAUSED'}`);
+    }
+
     gameLoop() {
         const now = performance.now();
         const delta = (now - this.lastTime) / 1000;  // Convert to seconds
@@ -511,8 +523,42 @@ class PlanetEdenWasm {
         this.renderer.render();
         this.ui.update(delta);
 
+        // Update new HUD
+        this.updateHUD();
+
         // Continue loop
         requestAnimationFrame(() => this.gameLoop());
+    }
+
+    updateHUD() {
+        const stats = this.wasmModule.getStats();
+        const tribes = this.wasmModule.getAllTribes();
+        const typeCounts = SparklineGraph.countTypes(this.wasmModule);
+
+        // Update FPS
+        this.hud.updateFPS(this.ui.fps);
+
+        // Update population
+        this.hud.updatePopulation(stats.aliveCount);
+
+        // Update time (calculate day and time from simulation time)
+        const totalMinutes = Math.floor(stats.time * 2); // 2 sim-minutes per real second
+        const day = Math.floor(totalMinutes / 1440) + 1;
+        const hours = Math.floor((totalMinutes % 1440) / 60);
+        const mins = totalMinutes % 60;
+        const timeStr = `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+        this.hud.updateTime(day, timeStr);
+
+        // Update weather
+        if (this.renderer.weatherSystem) {
+            this.hud.updateWeather(this.renderer.weatherSystem.currentWeather || 'clear');
+        }
+
+        // Update stats and tribes (less frequently)
+        if (Math.floor(stats.time * 10) % 5 === 0) {
+            this.hud.updateStats(stats, typeCounts);
+            this.hud.updateTribes(tribes);
+        }
     }
 
     togglePanel(panelId) {
