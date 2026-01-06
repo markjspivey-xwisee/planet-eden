@@ -166,8 +166,11 @@ export class SparklineGraph {
             while (arr.length > this.maxDataPoints) arr.shift();
         });
 
-        // Update display
-        document.getElementById('spark-total').textContent = stats.aliveCount;
+        // Update display (skip if UI not created)
+        const sparkTotal = document.getElementById('spark-total');
+        if (sparkTotal) {
+            sparkTotal.textContent = stats.aliveCount;
+        }
 
         this.draw();
     }
