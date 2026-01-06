@@ -40,7 +40,7 @@ export class SparklineGraph {
     }
 
     createUI() {
-        // Container
+        // Container - hidden by default, press G to toggle
         this.container = document.createElement('div');
         this.container.id = 'sparkline-container';
         this.container.style.cssText = `
@@ -54,7 +54,9 @@ export class SparklineGraph {
             padding: 10px;
             z-index: 999;
             font-family: 'Segoe UI', sans-serif;
+            display: none;
         `;
+        this.visible = false;
 
         // Header
         const header = document.createElement('div');

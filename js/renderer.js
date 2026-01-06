@@ -3610,18 +3610,28 @@ export class Renderer {
                 const targetPos = new THREE.Vector3();
                 mesh.getWorldPosition(targetPos);
 
-                // Calculate camera position offset from target
-                const up = targetPos.clone().normalize();
-                const forward = new THREE.Vector3(1, 0, 0).cross(up).normalize();
-                const right = up.clone().cross(forward);
+                // Calculate proper camera orientation for spherical planet
+                // Up vector is the surface normal (pointing away from planet center)
+                const surfaceNormal = targetPos.clone().normalize();
 
-                // Position camera behind and above the creature
+                // Calculate camera position: offset along surface normal (up) and back from center
+                const cameraDistance = this.followOffset.z;
+                const cameraHeight = this.followOffset.y;
+
+                // Position camera above and behind the creature (relative to planet surface)
                 const cameraTarget = targetPos.clone()
-                    .add(up.clone().multiplyScalar(this.followOffset.y))
-                    .add(forward.clone().multiplyScalar(-this.followOffset.z));
+                    .add(surfaceNormal.clone().multiplyScalar(cameraHeight))
+                    .add(surfaceNormal.clone().multiplyScalar(cameraDistance * 0.3));
+
+                // Pull camera further from planet center to be "behind" the creature
+                const toPlanetCenter = cameraTarget.clone().normalize();
+                cameraTarget.add(toPlanetCenter.clone().multiplyScalar(cameraDistance * 0.7));
 
                 // Smooth camera movement
                 this.camera.position.lerp(cameraTarget, this.followLerp);
+
+                // Set camera up vector to surface normal for correct orientation
+                this.camera.up.lerp(surfaceNormal, this.followLerp);
 
                 // Look at the creature
                 this.controls.target.lerp(targetPos, this.followLerp);
@@ -3723,6 +3733,9 @@ export class Renderer {
         this.followMode = false;
         this.followTarget = null;
         this.controls.enableDamping = true;
+
+        // Reset camera up vector to world Y
+        this.camera.up.set(0, 1, 0);
 
         // Hide follow indicator
         this.showFollowIndicator(false);

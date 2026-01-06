@@ -118,13 +118,14 @@
             padding-bottom: 8px;
         }
 
-        /* Tribe Panel (Left) */
+        /* Tribe Panel (Left) - Hidden by default, press T to toggle */
         #tribe-panel {
             top: 20px;
             left: 20px;
-            width: 380px;
-            max-height: 650px;
+            width: 320px;
+            max-height: 500px;
             overflow-y: auto;
+            display: none;
         }
 
         .tribe-card {
@@ -168,11 +169,12 @@
             transition: width 0.3s;
         }
 
-        /* Stats Panel (Top Right) */
+        /* Stats Panel (Top Right) - Compact, always visible */
         #stats-panel {
             top: 20px;
             right: 20px;
-            width: 280px;
+            width: 200px;
+            padding: 10px;
         }
 
         .stat-row {
@@ -189,11 +191,12 @@
             font-weight: bold;
         }
 
-        /* God Powers Panel (Right) */
+        /* God Powers Panel (Right) - Hidden by default, press H to toggle */
         #god-powers-panel {
             top: 320px;
             right: 20px;
             width: 280px;
+            display: none;
         }
 
         .god-power-btn {
@@ -227,12 +230,13 @@
             margin-right: 10px;
         }
 
-        /* Population Chart (Bottom Right) */
+        /* Population Chart (Bottom Right) - Hidden by default (use G for sparkline) */
         #chart-panel {
             bottom: 20px;
             right: 20px;
             width: 450px;
             height: 250px;
+            display: none;
         }
 
         #population-chart {
@@ -240,11 +244,12 @@
             height: 180px;
         }
 
-        /* Controls Panel (Bottom Left) */
+        /* Controls Panel (Bottom Left) - Hidden by default, press H to toggle */
         #controls-panel {
             bottom: 20px;
             left: 20px;
             width: 380px;
+            display: none;
         }
 
         .control-group {
@@ -299,20 +304,18 @@
             border-radius: 50%;
         }
 
-        /* FPS Counter */
+        /* FPS Counter - Compact in corner */
         #fps-counter {
             position: fixed;
             top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.9);
-            padding: 12px 24px;
-            border-radius: 8px;
-            font-size: 24px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 12px;
             color: #0F0;
             font-weight: bold;
-            border: 2px solid #0F0;
-            box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+            border: 1px solid rgba(0, 255, 0, 0.3);
             z-index: 1000;
         }
 
@@ -590,39 +593,36 @@
     <!-- FPS Counter -->
     <div id="fps-counter">-- FPS</div>
 
-    <!-- Time Display -->
+    <!-- Time Display - Compact, top left -->
     <div id="time-display" style="
         position: fixed;
-        top: 60px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: rgba(0, 0, 0, 0.8);
-        padding: 8px 18px;
-        border-radius: 6px;
-        font-size: 16px;
+        top: 20px;
+        left: 100px;
+        background: rgba(0, 0, 0, 0.6);
+        padding: 6px 12px;
+        border-radius: 4px;
+        font-size: 12px;
         color: #ffd700;
-        border: 1px solid rgba(255, 215, 0, 0.3);
-        box-shadow: 0 0 15px rgba(255, 215, 0, 0.2);
+        border: 1px solid rgba(255, 215, 0, 0.2);
         z-index: 1000;
     ">Day 1 - 10:00</div>
 
-    <!-- Weather Display -->
+    <!-- Weather Display - Compact, top left -->
     <div id="weather-display" style="
         position: fixed;
-        top: 100px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: rgba(0, 0, 0, 0.7);
-        padding: 6px 14px;
-        border-radius: 6px;
-        font-size: 14px;
+        top: 20px;
+        left: 220px;
+        background: rgba(0, 0, 0, 0.6);
+        padding: 6px 12px;
+        border-radius: 4px;
+        font-size: 12px;
         color: #88ccff;
-        border: 1px solid rgba(136, 204, 255, 0.3);
+        border: 1px solid rgba(136, 204, 255, 0.2);
         z-index: 1000;
     ">Clear</div>
 
     <!-- Tribe Panel -->
-    <div id="tribe-panel" class="hud-panel mobile-active">
+    <div id="tribe-panel" class="hud-panel">
         <h3>🏛️ Tribal Civilizations</h3>
         <div id="tribe-list"></div>
     </div>
@@ -700,6 +700,20 @@
             </div>
         </div>
     </div>
+
+    <!-- Keyboard Hints -->
+    <div id="keyboard-hints" style="
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0, 0, 0, 0.5);
+        padding: 6px 16px;
+        border-radius: 4px;
+        font-size: 11px;
+        color: #666;
+        z-index: 900;
+    ">SPACE pause | T tribes | H help | L log | G graph | O goals | C follow | ? more</div>
 
     <!-- Chart.js Library -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>

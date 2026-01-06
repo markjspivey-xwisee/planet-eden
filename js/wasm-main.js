@@ -263,8 +263,21 @@ class PlanetEdenWasm {
                     this.renderer.toggleFollowMode();
                     break;
 
-                // Note: L, M, P, G are handled by their respective systems
-                // L = Event log, M = Mute/Audio, P = Screenshot, G = Graph
+                // Toggle panels
+                case 't':
+                case 'T':
+                    this.togglePanel('tribe-panel');
+                    break;
+
+                case 'h':
+                case 'H':
+                    // Toggle help/controls panels
+                    this.togglePanel('god-powers-panel');
+                    this.togglePanel('controls-panel');
+                    break;
+
+                // Note: L, M, P, G, O are handled by their respective systems
+                // L = Event log, M = Mute/Audio, P = Screenshot, G = Graph, O = Objectives
             }
         });
 
@@ -304,6 +317,11 @@ class PlanetEdenWasm {
         console.log('  M           - Toggle audio');
         console.log('  P           - Take screenshot');
         console.log('  G           - Toggle population graph');
+        console.log('  O           - Toggle objectives');
+        console.log('');
+        console.log('📋 PANELS');
+        console.log('  T           - Toggle tribes panel');
+        console.log('  H           - Toggle help panels');
         console.log('');
         console.log('═══════════════════════════════════════════════════');
         console.log('');
@@ -383,6 +401,14 @@ class PlanetEdenWasm {
 
         // Continue loop
         requestAnimationFrame(() => this.gameLoop());
+    }
+
+    togglePanel(panelId) {
+        const panel = document.getElementById(panelId);
+        if (panel) {
+            const isHidden = panel.style.display === 'none' || !panel.style.display;
+            panel.style.display = isHidden ? 'block' : 'none';
+        }
     }
 
     cleanup() {

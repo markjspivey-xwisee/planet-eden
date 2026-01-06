@@ -23,21 +23,22 @@ export class ScreenshotSystem {
         btn.title = 'Take Screenshot (P)';
         btn.style.cssText = `
             position: fixed;
-            top: 20px;
-            right: 130px;
-            width: 40px;
-            height: 40px;
-            background: rgba(0, 0, 0, 0.7);
-            border: 1px solid rgba(100, 200, 100, 0.3);
+            bottom: 20px;
+            right: 20px;
+            width: 36px;
+            height: 36px;
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(100, 200, 100, 0.2);
             border-radius: 50%;
             color: #fff;
-            font-size: 18px;
+            font-size: 16px;
             cursor: pointer;
             z-index: 1001;
             transition: all 0.2s;
+            opacity: 0.7;
         `;
-        btn.onmouseover = () => btn.style.background = 'rgba(50, 100, 50, 0.8)';
-        btn.onmouseout = () => btn.style.background = 'rgba(0, 0, 0, 0.7)';
+        btn.onmouseover = () => { btn.style.background = 'rgba(50, 100, 50, 0.8)'; btn.style.opacity = '1'; };
+        btn.onmouseout = () => { btn.style.background = 'rgba(0, 0, 0, 0.6)'; btn.style.opacity = '0.7'; };
         btn.onclick = () => this.capture();
         document.body.appendChild(btn);
 

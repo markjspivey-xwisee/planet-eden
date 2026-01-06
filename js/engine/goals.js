@@ -123,7 +123,7 @@ export class GoalSystem {
     }
 
     createUI() {
-        // Goals panel (top left, below stats)
+        // Goals panel (top left, below stats) - hidden by default, press O to toggle
         this.container = document.createElement('div');
         this.container.id = 'goals-panel';
         this.container.style.cssText = `
@@ -138,8 +138,16 @@ export class GoalSystem {
             z-index: 999;
             font-family: 'Segoe UI', sans-serif;
             color: #fff;
+            display: none;
         `;
         document.body.appendChild(this.container);
+
+        // Keyboard shortcut
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'o' || e.key === 'O') {
+                this.toggle();
+            }
+        });
 
         this.updateUI();
     }
