@@ -5,9 +5,9 @@
 const std = @import("std");
 
 // Version export to verify WASM is updated
-// Version: 9 - 500 organism capacity, genetic variation, more animals
+// Version: 10 - Disabled compaction (fixes visual jerking)
 export fn getVersion() u32 {
-    return 9;
+    return 10;
 }
 
 const tribe = @import("tribe.zig");

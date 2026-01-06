@@ -73,10 +73,12 @@ pub const Simulation = struct {
         self.updateMessages(delta);
         self.updateInteractions(delta);
 
-        // Periodic cleanup
-        if (self.frame_count % 600 == 0) { // Every 10 seconds at 60 FPS
-            self.organisms.compact();
-        }
+        // NOTE: Compaction disabled - it shifts organism indices which breaks the
+        // renderer's ID-based mesh tracking, causing visual jumping/jerking.
+        // With 500 capacity, we have plenty of room. Dead organisms are just skipped.
+        // if (self.frame_count % 600 == 0) {
+        //     self.organisms.compact();
+        // }
     }
 
     /// Rebuild spatial grid with current organism positions
