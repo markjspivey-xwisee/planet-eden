@@ -553,6 +553,7 @@ export class HUD {
             }
 
             /* ===== Hide old UI elements ===== */
+            #loading,
             #fps-counter,
             #time-display,
             #weather-display,
@@ -568,7 +569,8 @@ export class HUD {
             #sparkline-container,
             #achievement-toast,
             .mobile-panel-toggle,
-            .mobile-panel-hide {
+            .mobile-panel-hide,
+            .title {
                 display: none !important;
             }
         `;

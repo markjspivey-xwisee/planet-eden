@@ -37,6 +37,12 @@ export class LoadingScreen {
     }
 
     init() {
+        // Immediately hide old loading screen to prevent flash
+        const oldLoading = document.getElementById('loading');
+        if (oldLoading) {
+            oldLoading.style.display = 'none';
+        }
+
         this.createOverlay();
         this.startTipRotation();
         console.log('[LoadingScreen] Initialized');
