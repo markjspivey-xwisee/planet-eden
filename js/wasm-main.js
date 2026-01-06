@@ -18,6 +18,9 @@ import { saveSystem } from './engine/savesystem.js';
 import { uiAnimations } from './engine/uianimations.js';
 import { hud } from './engine/hud.js';
 
+// Global flag to indicate new HUD is active - prevents old UI systems from creating elements
+window.PLANET_EDEN_USE_NEW_HUD = true;
+
 class PlanetEdenWasm {
     constructor() {
         this.wasmModule = new WasmModule();

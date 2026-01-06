@@ -40,6 +40,12 @@ export class SparklineGraph {
     }
 
     createUI() {
+        // Skip UI creation if new HUD is active
+        if (window.PLANET_EDEN_USE_NEW_HUD) {
+            console.log('[Sparkline] Skipping old UI - using new HUD');
+            return;
+        }
+
         // Container - hidden by default, press G to toggle
         // Positioned above the screenshot/audio buttons
         this.container = document.createElement('div');

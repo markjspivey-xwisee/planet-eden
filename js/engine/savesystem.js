@@ -33,6 +33,12 @@ export class SaveSystem {
     }
 
     createUI() {
+        // Skip UI creation if new HUD is active
+        if (window.PLANET_EDEN_USE_NEW_HUD) {
+            console.log('[SaveSystem] Skipping old UI - using new HUD');
+            return;
+        }
+
         // Add save/load buttons to the UI
         const container = document.createElement('div');
         container.id = 'save-load-buttons';

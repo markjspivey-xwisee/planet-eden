@@ -16,6 +16,12 @@ export class ScreenshotSystem {
     }
 
     createUI() {
+        // Skip UI creation if new HUD is active
+        if (window.PLANET_EDEN_USE_NEW_HUD) {
+            console.log('[ScreenshotSystem] Skipping old UI - using new HUD');
+            return;
+        }
+
         // Screenshot button
         const btn = document.createElement('button');
         btn.id = 'screenshot-btn';

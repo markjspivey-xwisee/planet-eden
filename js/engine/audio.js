@@ -34,6 +34,18 @@ export class AudioSystem {
     }
 
     createToggleButton() {
+        // Skip UI creation if new HUD is active
+        if (window.PLANET_EDEN_USE_NEW_HUD) {
+            console.log('[AudioSystem] Skipping old UI - using new HUD');
+            // Still setup keyboard shortcut
+            window.addEventListener('keydown', (e) => {
+                if (e.key === 'm' || e.key === 'M') {
+                    this.toggle();
+                }
+            });
+            return;
+        }
+
         const btn = document.createElement('button');
         btn.id = 'audio-toggle';
         btn.innerHTML = '🔇';
@@ -78,11 +90,13 @@ export class AudioSystem {
         if (this.enabled) {
             this.context.resume();
             this.startAmbience();
-            btn.innerHTML = '🔊';
+            if (btn) btn.innerHTML = '🔊';
         } else {
             this.stopAmbience();
-            btn.innerHTML = '🔇';
+            if (btn) btn.innerHTML = '🔇';
         }
+
+        console.log(`[AudioSystem] Audio ${this.enabled ? 'enabled' : 'disabled'}`);
     }
 
     initAudioContext() {
