@@ -115,9 +115,10 @@ export class GoalSystem {
         ];
     }
 
-    init(eventSystem = null, audioSystem = null) {
+    init(eventSystem = null, audioSystem = null, particleSystem = null) {
         this.eventSystem = eventSystem;
         this.audioSystem = audioSystem;
+        this.particleSystem = particleSystem;
         this.createUI();
         console.log('[GoalSystem] Initialized with', this.goals.length, 'goals');
     }
@@ -243,6 +244,23 @@ export class GoalSystem {
         // Play sound
         if (this.audioSystem) {
             this.audioSystem.playEventSound('milestone');
+        }
+
+        // Emit celebration particles (confetti effect!)
+        if (this.particleSystem) {
+            // Emit from multiple positions for full-screen celebration
+            for (let i = 0; i < 5; i++) {
+                const angle = (i / 5) * Math.PI * 2;
+                const radius = 15 + Math.random() * 10;
+                const x = Math.cos(angle) * radius;
+                const z = Math.sin(angle) * radius;
+                const y = 5 + Math.random() * 5;
+
+                // Delayed bursts for cascading effect
+                setTimeout(() => {
+                    this.particleSystem.emitCelebration(x, y, z);
+                }, i * 100);
+            }
         }
 
         // Update UI

@@ -1,5 +1,6 @@
 // Enhanced WASM UI Module - Full tribal civilization interface
 import { OrganismType } from './wasm-loader.js';
+import { SparklineGraph } from './engine/sparkline.js';
 
 export class WasmUI {
     constructor(wasmModule, renderer = null) {
@@ -521,10 +522,16 @@ export class WasmUI {
 
         if (!stats) return;
 
+        // Get organism counts by type
+        const typeCounts = SparklineGraph.countTypes(this.wasmModule);
+
         const statsHTML = `
             <div class="stat-row">
                 <span>🧬 Organisms</span>
                 <span class="stat-value">${stats.aliveCount} / ${stats.organismCount}</span>
+            </div>
+            <div class="stat-row stat-breakdown" style="font-size: 10px; color: #888; padding-left: 16px;">
+                <span>🌿 ${typeCounts.plants} · 🦌 ${typeCounts.herbivores} · 🦁 ${typeCounts.carnivores} · 👤 ${typeCounts.humanoids}</span>
             </div>
             <div class="stat-row">
                 <span>🏛️ Tribes</span>

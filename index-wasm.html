@@ -421,9 +421,42 @@
             box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
         }
 
+        /* Mobile Panel Hide Button */
+        .mobile-panel-hide {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(255, 0, 0, 0.2);
+            border: 2px solid #f55;
+            border-radius: 50%;
+            width: 44px;
+            height: 44px;
+            color: #f55;
+            font-size: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            z-index: 1100;
+            box-shadow: 0 0 20px rgba(255, 0, 0, 0.3);
+            line-height: 40px;
+            text-align: center;
+        }
+
+        .mobile-panel-hide.panels-hidden {
+            background: rgba(0, 255, 0, 0.2);
+            border-color: #0F0;
+            color: #0F0;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
+        }
+
         /* Mobile Styles - Using both display and visibility for maximum compatibility */
         @media screen and (max-width: 960px) {
             .mobile-panel-toggle {
+                display: block !important;
+                visibility: visible !important;
+            }
+
+            .mobile-panel-hide {
                 display: block !important;
                 visibility: visible !important;
             }
@@ -586,6 +619,7 @@
     <div class="mobile-panel-toggle" id="mobile-panel-toggle">
         📊 Panels
     </div>
+    <div class="mobile-panel-hide" id="mobile-panel-hide">✕</div>
 
     <!-- Achievement Toast -->
     <div id="achievement-toast"></div>

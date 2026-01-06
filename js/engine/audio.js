@@ -7,12 +7,20 @@ export class AudioSystem {
         this.masterGain = null;
         this.enabled = false;
         this.initialized = false;
-        this.volume = 0.3;
+
+        // Volume controls
+        this.volume = 0.3;      // Master volume
+        this.sfxVolume = 0.8;   // Sound effects volume
+        this.ambientVolume = 0.6; // Ambient sounds volume
 
         // Oscillators and nodes
         this.ambientNodes = [];
         this.windNode = null;
         this.birdTimer = null;
+
+        // Weather sound nodes
+        this.rainNode = null;
+        this.thunderTimer = null;
 
         // State tracking
         this.timeOfDay = 0; // 0-1, affects soundscape
@@ -360,6 +368,7 @@ export class AudioSystem {
 
     // Weather effects
     setWeather(weather) {
+        const prevWeather = this.weather;
         this.weather = weather;
         if (!this.context || !this.enabled) return;
 
@@ -368,6 +377,326 @@ export class AudioSystem {
             const windVolume = weather === 'storm' ? 0.4 : weather === 'rain' ? 0.25 : 0.15;
             this.windNode.gain.gain.setTargetAtTime(windVolume, this.context.currentTime, 1);
         }
+
+        // Start/stop rain sounds
+        if ((weather === 'rain' || weather === 'storm') && !this.rainNode) {
+            this.startRainSound();
+        } else if (weather === 'clear' && this.rainNode) {
+            this.stopRainSound();
+        }
+
+        // Adjust rain intensity
+        if (this.rainNode) {
+            const rainVolume = weather === 'storm' ? 0.35 : weather === 'rain' ? 0.2 : 0;
+            this.rainNode.gain.gain.setTargetAtTime(rainVolume, this.context.currentTime, 2);
+        }
+
+        // Thunder for storms
+        if (weather === 'storm' && prevWeather !== 'storm') {
+            this.startThunderSounds();
+        } else if (weather !== 'storm' && this.thunderTimer) {
+            clearTimeout(this.thunderTimer);
+            this.thunderTimer = null;
+        }
+    }
+
+    // Rain sound effect - pink noise filtered to sound like rain
+    startRainSound() {
+        if (!this.context) return;
+
+        // Create noise buffer
+        const bufferSize = this.context.sampleRate * 2;
+        const buffer = this.context.createBuffer(1, bufferSize, this.context.sampleRate);
+        const data = buffer.getChannelData(0);
+
+        // Pink noise (better rain sound than white or brown)
+        let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+        for (let i = 0; i < bufferSize; i++) {
+            const white = Math.random() * 2 - 1;
+            b0 = 0.99886 * b0 + white * 0.0555179;
+            b1 = 0.99332 * b1 + white * 0.0750759;
+            b2 = 0.96900 * b2 + white * 0.1538520;
+            b3 = 0.86650 * b3 + white * 0.3104856;
+            b4 = 0.55000 * b4 + white * 0.5329522;
+            b5 = -0.7616 * b5 - white * 0.0168980;
+            data[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.11;
+            b6 = white * 0.115926;
+        }
+
+        const noise = this.context.createBufferSource();
+        noise.buffer = buffer;
+        noise.loop = true;
+
+        // Filter chain for realistic rain
+        const highpass = this.context.createBiquadFilter();
+        highpass.type = 'highpass';
+        highpass.frequency.value = 1000;
+
+        const lowpass = this.context.createBiquadFilter();
+        lowpass.type = 'lowpass';
+        lowpass.frequency.value = 8000;
+
+        const gain = this.context.createGain();
+        gain.gain.value = 0;
+
+        // Random crackle modulation for rain drops
+        const crackleLfo = this.context.createOscillator();
+        const crackleGain = this.context.createGain();
+        crackleLfo.type = 'square';
+        crackleLfo.frequency.value = 20 + Math.random() * 30;
+        crackleGain.gain.value = 0.02;
+        crackleLfo.connect(crackleGain);
+        crackleGain.connect(gain.gain);
+        crackleLfo.start();
+
+        noise.connect(highpass);
+        highpass.connect(lowpass);
+        lowpass.connect(gain);
+        gain.connect(this.masterGain);
+
+        noise.start();
+
+        this.rainNode = { noise, highpass, lowpass, gain, crackleLfo, crackleGain };
+        console.log('[AudioSystem] Rain sound started');
+    }
+
+    stopRainSound() {
+        if (this.rainNode) {
+            this.rainNode.noise.stop();
+            this.rainNode.crackleLfo.stop();
+            this.rainNode = null;
+            console.log('[AudioSystem] Rain sound stopped');
+        }
+    }
+
+    // Thunder sound effects for storms
+    startThunderSounds() {
+        const playThunder = () => {
+            if (!this.enabled || !this.context || this.weather !== 'storm') return;
+
+            this.playThunderRumble();
+
+            // Random interval between thunder
+            const delay = 8000 + Math.random() * 20000; // 8-28 seconds
+            this.thunderTimer = setTimeout(playThunder, delay);
+        };
+
+        // First thunder after short delay
+        this.thunderTimer = setTimeout(playThunder, 2000 + Math.random() * 5000);
+    }
+
+    playThunderRumble() {
+        if (!this.context || !this.enabled) return;
+
+        // Low frequency rumble
+        const osc1 = this.context.createOscillator();
+        const osc2 = this.context.createOscillator();
+        const gain = this.context.createGain();
+        const filter = this.context.createBiquadFilter();
+
+        osc1.type = 'sawtooth';
+        osc1.frequency.value = 40 + Math.random() * 30;
+        osc2.type = 'triangle';
+        osc2.frequency.value = 60 + Math.random() * 40;
+
+        filter.type = 'lowpass';
+        filter.frequency.value = 200;
+
+        // Thunder envelope - starts loud, rumbles, fades
+        const now = this.context.currentTime;
+        const duration = 2 + Math.random() * 2;
+
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(0.4, now + 0.05); // Sharp attack
+        gain.gain.linearRampToValueAtTime(0.2, now + 0.3);  // Initial drop
+        gain.gain.linearRampToValueAtTime(0.25, now + 0.6); // Rumble up
+        gain.gain.linearRampToValueAtTime(0.1, now + duration * 0.5);
+        gain.gain.linearRampToValueAtTime(0, now + duration); // Fade out
+
+        // Frequency modulation for rumble character
+        osc1.frequency.setValueAtTime(osc1.frequency.value, now);
+        osc1.frequency.linearRampToValueAtTime(osc1.frequency.value * 0.5, now + duration);
+
+        osc1.connect(filter);
+        osc2.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.masterGain);
+
+        osc1.start(now);
+        osc2.start(now);
+        osc1.stop(now + duration + 0.1);
+        osc2.stop(now + duration + 0.1);
+
+        // Add crackle noise for lightning crack
+        this.playThunderCrack();
+
+        console.log('[AudioSystem] Thunder!');
+    }
+
+    playThunderCrack() {
+        if (!this.context) return;
+
+        // Short burst of noise for the initial crack
+        const bufferSize = this.context.sampleRate * 0.3;
+        const buffer = this.context.createBuffer(1, bufferSize, this.context.sampleRate);
+        const data = buffer.getChannelData(0);
+
+        for (let i = 0; i < bufferSize; i++) {
+            const decay = 1 - (i / bufferSize);
+            data[i] = (Math.random() * 2 - 1) * decay * decay;
+        }
+
+        const noise = this.context.createBufferSource();
+        noise.buffer = buffer;
+
+        const gain = this.context.createGain();
+        gain.gain.value = 0.3;
+
+        const filter = this.context.createBiquadFilter();
+        filter.type = 'highpass';
+        filter.frequency.value = 500;
+
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.masterGain);
+
+        noise.start();
+    }
+
+    // Volume control methods for settings integration
+    setMasterVolume(value) {
+        this.volume = Math.max(0, Math.min(1, value));
+        if (this.masterGain) {
+            this.masterGain.gain.setTargetAtTime(this.volume, this.context.currentTime, 0.1);
+        }
+        console.log('[AudioSystem] Master volume:', Math.round(this.volume * 100) + '%');
+    }
+
+    setSfxVolume(value) {
+        this.sfxVolume = Math.max(0, Math.min(1, value));
+        // SFX volume affects individual sound effects when they play
+        console.log('[AudioSystem] SFX volume:', Math.round(this.sfxVolume * 100) + '%');
+    }
+
+    setAmbientVolume(value) {
+        this.ambientVolume = Math.max(0, Math.min(1, value));
+        // Adjust ambient nodes if they exist
+        this.ambientNodes.forEach(node => {
+            if (node.gain) {
+                node.gain.gain.setTargetAtTime(
+                    node.baseVolume * this.ambientVolume,
+                    this.context.currentTime,
+                    0.2
+                );
+            }
+        });
+        console.log('[AudioSystem] Ambient volume:', Math.round(this.ambientVolume * 100) + '%');
+    }
+
+    // UI Sound Effects
+    playClick() {
+        if (!this.context || !this.enabled) return;
+
+        const osc = this.context.createOscillator();
+        const gain = this.context.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.value = 800;
+
+        const now = this.context.currentTime;
+        gain.gain.setValueAtTime(0.15 * this.sfxVolume, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+
+        osc.start(now);
+        osc.stop(now + 0.08);
+    }
+
+    playHover() {
+        if (!this.context || !this.enabled) return;
+
+        const osc = this.context.createOscillator();
+        const gain = this.context.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.value = 600;
+
+        const now = this.context.currentTime;
+        gain.gain.setValueAtTime(0.05 * this.sfxVolume, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+
+        osc.start(now);
+        osc.stop(now + 0.05);
+    }
+
+    playPanelOpen() {
+        if (!this.context || !this.enabled) return;
+
+        const osc = this.context.createOscillator();
+        const gain = this.context.createGain();
+
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(400, this.context.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(800, this.context.currentTime + 0.1);
+
+        const now = this.context.currentTime;
+        gain.gain.setValueAtTime(0.1 * this.sfxVolume, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+
+        osc.start(now);
+        osc.stop(now + 0.15);
+    }
+
+    playPanelClose() {
+        if (!this.context || !this.enabled) return;
+
+        const osc = this.context.createOscillator();
+        const gain = this.context.createGain();
+
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(800, this.context.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(400, this.context.currentTime + 0.1);
+
+        const now = this.context.currentTime;
+        gain.gain.setValueAtTime(0.1 * this.sfxVolume, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+
+        osc.start(now);
+        osc.stop(now + 0.12);
+    }
+
+    playSuccess() {
+        if (!this.context || !this.enabled) return;
+
+        // Two-note success chime
+        [600, 900].forEach((freq, i) => {
+            const osc = this.context.createOscillator();
+            const gain = this.context.createGain();
+
+            osc.type = 'sine';
+            osc.frequency.value = freq;
+
+            const now = this.context.currentTime + i * 0.1;
+            gain.gain.setValueAtTime(0.12 * this.sfxVolume, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+
+            osc.connect(gain);
+            gain.connect(this.masterGain);
+
+            osc.start(now);
+            osc.stop(now + 0.2);
+        });
     }
 }
 

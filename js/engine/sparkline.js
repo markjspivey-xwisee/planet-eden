@@ -41,11 +41,12 @@ export class SparklineGraph {
 
     createUI() {
         // Container - hidden by default, press G to toggle
+        // Positioned above the screenshot/audio buttons
         this.container = document.createElement('div');
         this.container.id = 'sparkline-container';
         this.container.style.cssText = `
             position: fixed;
-            bottom: 20px;
+            bottom: 70px;
             right: 20px;
             width: 200px;
             background: rgba(0, 0, 0, 0.85);

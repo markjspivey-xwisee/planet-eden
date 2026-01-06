@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planet Eden - Realistic AI Life Simulation</title>
+    <meta name="description" content="Watch AI life evolve on a realistic living planet">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            overflow: hidden;
+            background: #000;
+            color: #fff;
+        }
+
+        #canvas-container { width: 100vw; height: 100vh; }
+
+        #loading-screen {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: linear-gradient(135deg, #0a1128 0%, #001F54 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            transition: opacity 0.5s;
+        }
+
+        #loading-screen.hidden { opacity: 0; pointer-events: none; }
+
+        .loading-title {
+            font-size: 3rem;
+            font-weight: 200;
+            margin-bottom: 2rem;
+            background: linear-gradient(135deg, #00d4ff, #7b2ff7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: 8px;
+        }
+
+        .loading-bar-container {
+            width: 400px;
+            height: 4px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .loading-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #00d4ff, #7b2ff7);
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+        .loading-text {
+            margin-top: 1rem;
+            font-size: 0.9rem;
+            color: rgba(255,255,255,0.5);
+        }
+
+        .hud {
+            position: fixed;
+            background: rgba(10,17,40,0.85);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+        }
+
+        #stats {
+            top: 20px;
+            right: 20px;
+            min-width: 220px;
+        }
+
+        #info {
+            bottom: 20px;
+            right: 20px;
+            max-width: 320px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        #info.show { opacity: 1; }
+
+        #controls {
+            bottom: 20px;
+            left: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            max-width: 500px;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 0.6rem 0;
+            padding-bottom: 0.6rem;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .stat-label { color: rgba(255,255,255,0.6); font-size: 0.85rem; }
+        .stat-value { font-weight: 600; color: #00d4ff; font-size: 0.9rem; }
+
+        button {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            padding: 0.7rem 1.2rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+            backdrop-filter: blur(10px);
+        }
+
+        button:hover {
+            background: rgba(255,255,255,0.2);
+            transform: translateY(-2px);
+        }
+
+        button.primary {
+            background: linear-gradient(135deg, #00d4ff, #7b2ff7);
+            border: none;
+            font-weight: 500;
+        }
+
+        .notification {
+            position: fixed;
+            top: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, rgba(0,212,255,0.9), rgba(123,47,247,0.9));
+            padding: 1rem 2rem;
+            border-radius: 8px;
+            animation: slideDown 0.3s;
+            z-index: 100;
+        }
+
+        @keyframes slideDown {
+            from { transform: translateX(-50%) translateY(-20px); opacity: 0; }
+            to { transform: translateX(-50%) translateY(0); opacity: 1; }
+        }
+
+        h3 {
+            margin-bottom: 1rem;
+            font-weight: 500;
+            font-size: 1.1rem;
+            color: #00d4ff;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading-screen">
+        <div class="loading-title">PLANET EDEN</div>
+        <div class="loading-bar-container">
+            <div class="loading-bar" id="loading-bar"></div>
+        </div>
+        <div class="loading-text" id="loading-text">Generating planet...</div>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <div id="stats" class="hud">
+        <h3>🌍 Ecosystem</h3>
+        <div class="stat-row">
+            <span class="stat-label">🌳 Plants</span>
+            <span class="stat-value" id="plant-count">0</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">🦌 Herbivores</span>
+            <span class="stat-value" id="herbivore-count">0</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">🦁 Carnivores</span>
+            <span class="stat-value" id="carnivore-count">0</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">👤 Humanoids</span>
+            <span class="stat-value" id="humanoid-count">0</span>
+        </div>
+        <div class="stat-row" style="border: none;">
+            <span class="stat-label">📅 Day</span>
+            <span class="stat-value" id="day-count">0</span>
+        </div>
+    </div>
+
+    <div id="info" class="hud">
+        <h3>Selected Creature</h3>
+        <div id="creature-info"></div>
+    </div>
+
+    <div id="controls">
+        <button id="btn-pause">⏸ Pause</button>
+        <button id="btn-speed">⏩ 1x</button>
+        <button class="primary" id="btn-evolve">⚡ Evolve All</button>
+        <button id="btn-spawn-plants">🌳 +Plants</button>
+        <button id="btn-spawn-herbivores">🦌 +Herbivores</button>
+        <button id="btn-spawn-carnivores">🦁 +Carnivores</button>
+        <button id="btn-spawn-humanoids">👤 +Humanoids</button>
+    </div>
+
+    <script>
+        function showNotification(msg) {
+            const n = document.createElement('div');
+            n.className = 'notification';
+            n.textContent = msg;
+            document.body.appendChild(n);
+            setTimeout(() => n.remove(), 3000);
+        }
+
+        (function() {
+            const libs = {
+                three: {
+                    name: 'THREE',
+                    urls: [
+                        'https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js',
+                        'https://unpkg.com/three@0.158.0/build/three.min.js'
+                    ]
+                }
+            };
+
+            function updateProgress(p, t) {
+                document.getElementById('loading-bar').style.width = p + '%';
+                document.getElementById('loading-text').textContent = t;
+            }
+
+            function loadScript(url) {
+                return new Promise((resolve, reject) => {
+                    const s = document.createElement('script');
+                    s.src = url;
+                    s.onload = resolve;
+                    s.onerror = reject;
+                    document.head.appendChild(s);
+                });
+            }
+
+            function tryLoad(lib, i = 0) {
+                return new Promise((resolve, reject) => {
+                    if (i >= lib.urls.length) {
+                        reject(new Error('Failed to load'));
+                        return;
+                    }
+                    loadScript(lib.urls[i])
+                        .then(() => window[lib.name] ? resolve() : Promise.reject())
+                        .catch(() => tryLoad(lib, i + 1).then(resolve).catch(reject));
+                });
+            }
+
+            tryLoad(libs.three)
+                .then(() => {
+                    updateProgress(100, 'Ready!');
+                    setTimeout(() => {
+                        document.getElementById('loading-screen').classList.add('hidden');
+                    }, 300);
+                    init();
+                })
+                .catch(() => {
+                    updateProgress(0, 'Failed to load. Check connection.');
+                });
+        })();
+
+        function init() {
+            const scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x050510);
+            scene.fog = new THREE.FogExp2(0x050510, 0.00015);
+
+            const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 60, 140);
+
+            const renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0x404060, 0.6);
+            scene.add(ambientLight);
+
+            const sunLight = new THREE.DirectionalLight(0xffffee, 1.8);
+            sunLight.position.set(100, 150, -300);
+            sunLight.castShadow = true;
+            sunLight.shadow.mapSize.width = 2048;
+            sunLight.shadow.mapSize.height = 2048;
+            sunLight.shadow.camera.left = -150;
+            sunLight.shadow.camera.right = 150;
+            sunLight.shadow.camera.top = 150;
+            sunLight.shadow.camera.bottom = -150;
+            scene.add(sunLight);
+
+            const fillLight = new THREE.DirectionalLight(0x8888ff, 0.3);
+            fillLight.position.set(-50, 50, 100);
+            scene.add(fillLight);
+
+            // ========== REALISTIC PLANET ==========
+            const PLANET_RADIUS = 50;
+            const planetGroup = new THREE.Group();
+            scene.add(planetGroup);
+
+            const planetGeometry = new THREE.SphereGeometry(PLANET_RADIUS, 128, 128);
+            const positions = planetGeometry.attributes.position;
+            const colors = new Float32Array(positions.count * 3);
+
+            // Advanced terrain generation with biomes
+            function noise(x, y, z) {
+                return Math.sin(x * 2) * Math.cos(y * 2) * Math.sin(z * 2) +
+                       Math.sin(x * 4.5) * Math.cos(y * 4.5) * 0.5 +
+                       Math.sin(x * 8.2) * 0.25;
+            }
+
+            function getTerrainHeight(nx, ny, nz) {
+                const continentNoise = noise(nx * 0.8, ny * 0.8, nz * 0.8) * 8;
+                const mountainNoise = noise(nx * 3, ny * 3, nz * 3) * 3;
+                const detailNoise = noise(nx * 10, ny * 10, nz * 10) * 0.5;
+                return continentNoise + mountainNoise + detailNoise;
+            }
+
+            function getBiomeColor(height, latitude) {
+                const absLat = Math.abs(latitude);
+
+                if (height < -2) return new THREE.Color(0x001a3a); // Deep ocean
+                if (height < 0) return new THREE.Color(0x0d4a7a); // Ocean
+                if (height < 0.5) return new THREE.Color(0xe8d4a0); // Beach
+                if (height < 2) {
+                    if (absLat > 0.7) return new THREE.Color(0x708090); // Tundra
+                    if (absLat > 0.4) return new THREE.Color(0x567d46); // Temperate forest
+                    return new THREE.Color(0x6b8e23); // Grassland
+                }
+                if (height < 5) {
+                    if (absLat > 0.6) return new THREE.Color(0x8b7355); // Mountain
+                    return new THREE.Color(0x2d5016); // Forest
+                }
+                if (height < 8) return new THREE.Color(0x696969); // Rocky mountain
+                return new THREE.Color(0xf0f8ff); // Snow peak
+            }
+
+            const terrainData = [];
+
+            for (let i = 0; i < positions.count; i++) {
+                const x = positions.getX(i);
+                const y = positions.getY(i);
+                const z = positions.getZ(i);
+
+                const len = Math.sqrt(x * x + y * y + z * z);
+                const nx = x / len, ny = y / len, nz = z / len;
+
+                const height = getTerrainHeight(nx, ny, nz);
+                const latitude = Math.asin(ny);
+                const color = getBiomeColor(height, latitude);
+
+                positions.setXYZ(i, nx * (PLANET_RADIUS + height), ny * (PLANET_RADIUS + height), nz * (PLANET_RADIUS + height));
+                colors[i * 3] = color.r;
+                colors[i * 3 + 1] = color.g;
+                colors[i * 3 + 2] = color.b;
+
+                terrainData.push({ height, latitude, nx, ny, nz });
+            }
+
+            planetGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            planetGeometry.computeVertexNormals();
+
+            const planet = new THREE.Mesh(planetGeometry, new THREE.MeshStandardMaterial({
+                vertexColors: true,
+                roughness: 0.8,
+                metalness: 0.1
+            }));
+            planet.castShadow = true;
+            planet.receiveShadow = true;
+            planetGroup.add(planet);
+
+            // Beautiful atmosphere
+            const atmoGeo = new THREE.SphereGeometry(PLANET_RADIUS + 5, 64, 64);
+            const atmoMat = new THREE.ShaderMaterial({
+                vertexShader: `
+                    varying vec3 vNormal;
+                    void main() {
+                        vNormal = normalize(normalMatrix * normal);
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                    }
+                `,
+                fragmentShader: `
+                    varying vec3 vNormal;
+                    void main() {
+                        float intensity = pow(0.5 - dot(vNormal, vec3(0, 0, 1.0)), 3.0);
+                        gl_FragColor = vec4(0.4, 0.6, 1.0, 1.0) * intensity * 2.5;
+                    }
+                `,
+                blending: THREE.AdditiveBlending,
+                side: THREE.BackSide,
+                transparent: true
+            });
+            planetGroup.add(new THREE.Mesh(atmoGeo, atmoMat));
+
+            // ========== ORGANISM SYSTEM ==========
+            class Brain {
+                constructor(complexity = 1) {
+                    this.weights = Array(20 * complexity).fill(0).map(() => Math.random() * 2 - 1);
+                    this.memory = [];
+                }
+
+                think(inputs) {
+                    const sum = inputs.reduce((s, input, i) => s + input * this.weights[i % this.weights.length], 0);
+                    return Math.tanh(sum);
+                }
+
+                clone() {
+                    const b = new Brain();
+                    b.weights = [...this.weights];
+                    return b;
+                }
+
+                mutate() {
+                    const i = Math.floor(Math.random() * this.weights.length);
+                    this.weights[i] += (Math.random() - 0.5) * 0.4;
+                }
+            }
+
+            let orgId = 0;
+            const organisms = [];
+            let selected = null;
+
+            class Organism {
+                constructor(type, pos) {
+                    this.id = orgId++;
+                    this.type = type;
+                    this.position = pos.clone();
+                    this.velocity = new THREE.Vector3();
+                    this.age = 0;
+                    this.energy = 100;
+                    this.health = 100;
+                    this.generation = 1;
+                    this.brain = type !== 'plant' ? new Brain(type === 'humanoid' ? 2 : 1) : null;
+                    this.dead = false;
+                    this.reproduceTimer = 0;
+                    this.intelligence = type === 'humanoid' ? 10 : (type === 'carnivore' ? 3 : 1);
+
+                    const sizes = { plant: 2.5, herbivore: 2, carnivore: 2.5, humanoid: 3 };
+                    const speeds = { plant: 0, herbivore: 0.18, carnivore: 0.22, humanoid: 0.15 };
+
+                    this.size = sizes[type];
+                    this.speed = speeds[type];
+
+                    this.createMesh();
+                }
+
+                createMesh() {
+                    const group = new THREE.Group();
+
+                    if (this.type === 'plant') {
+                        // Tree-like structure
+                        const trunkGeo = new THREE.CylinderGeometry(0.2, 0.3, this.size * 0.8, 8);
+                        const trunkMat = new THREE.MeshStandardMaterial({ color: 0x4a3520, roughness: 0.9 });
+                        const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+                        trunk.position.y = this.size * 0.4;
+                        group.add(trunk);
+
+                        const canopyGeo = new THREE.SphereGeometry(this.size * 0.6, 8, 8);
+                        const canopyMat = new THREE.MeshStandardMaterial({
+                            color: 0x2d5016,
+                            emissive: 0x1a3010,
+                            emissiveIntensity: 0.3,
+                            roughness: 0.7
+                        });
+                        const canopy = new THREE.Mesh(canopyGeo, canopyMat);
+                        canopy.position.y = this.size * 1.2;
+                        canopy.scale.set(1, 1.2, 1);
+                        group.add(canopy);
+
+                    } else if (this.type === 'herbivore') {
+                        // Four-legged animal
+                        const bodyGeo = new THREE.BoxGeometry(this.size, this.size * 0.6, this.size * 1.2);
+                        const bodyMat = new THREE.MeshStandardMaterial({
+                            color: 0x8b6914,
+                            emissive: 0x443509,
+                            emissiveIntensity: 0.4,
+                            roughness: 0.6
+                        });
+                        const body = new THREE.Mesh(bodyGeo, bodyMat);
+                        body.position.y = this.size * 0.5;
+                        group.add(body);
+
+                        // Legs
+                        const legGeo = new THREE.CylinderGeometry(0.15, 0.15, this.size * 0.5, 6);
+                        for (let i = 0; i < 4; i++) {
+                            const leg = new THREE.Mesh(legGeo, bodyMat);
+                            leg.position.set(
+                                i % 2 === 0 ? -this.size * 0.3 : this.size * 0.3,
+                                this.size * 0.25,
+                                i < 2 ? this.size * 0.4 : -this.size * 0.4
+                            );
+                            group.add(leg);
+                        }
+
+                    } else if (this.type === 'carnivore') {
+                        // Predator
+                        const bodyGeo = new THREE.ConeGeometry(this.size * 0.7, this.size * 1.5, 8);
+                        const bodyMat = new THREE.MeshStandardMaterial({
+                            color: 0x8b0000,
+                            emissive: 0x450000,
+                            emissiveIntensity: 0.5,
+                            roughness: 0.5,
+                            metalness: 0.2
+                        });
+                        const body = new THREE.Mesh(bodyGeo, bodyMat);
+                        body.position.y = this.size * 0.8;
+                        body.rotation.x = Math.PI;
+                        group.add(body);
+
+                    } else { // humanoid
+                        // Bipedal humanoid
+                        const bodyGeo = new THREE.BoxGeometry(this.size * 0.6, this.size * 1, this.size * 0.4);
+                        const bodyMat = new THREE.MeshStandardMaterial({
+                            color: 0xffdbac,
+                            emissive: 0x6b5544,
+                            emissiveIntensity: 0.3,
+                            roughness: 0.7
+                        });
+                        const body = new THREE.Mesh(bodyGeo, bodyMat);
+                        body.position.y = this.size * 0.9;
+                        group.add(body);
+
+                        // Head
+                        const headGeo = new THREE.SphereGeometry(this.size * 0.3, 8, 8);
+                        const head = new THREE.Mesh(headGeo, bodyMat);
+                        head.position.y = this.size * 1.6;
+                        group.add(head);
+
+                        // Legs
+                        const legGeo = new THREE.CylinderGeometry(0.15, 0.15, this.size * 0.8, 6);
+                        for (let i = 0; i < 2; i++) {
+                            const leg = new THREE.Mesh(legGeo, bodyMat);
+                            leg.position.set(i === 0 ? -this.size * 0.2 : this.size * 0.2, this.size * 0.4, 0);
+                            group.add(leg);
+                        }
+                    }
+
+                    group.castShadow = true;
+                    group.receiveShadow = true;
+                    this.mesh = group;
+                    this.mesh.userData.organism = this;
+                    this.updateMeshPosition();
+                    planetGroup.add(this.mesh);
+                }
+
+                updateMeshPosition() {
+                    if (!this.mesh) return;
+
+                    // Orient to sphere surface (gravity)
+                    const normal = this.position.clone().normalize();
+                    const distance = PLANET_RADIUS + (this.type === 'plant' ? this.size * 0.1 : 0);
+
+                    this.mesh.position.copy(normal.clone().multiplyScalar(distance));
+
+                    // Make organism stand upright on sphere
+                    this.mesh.up.copy(normal);
+                    this.mesh.lookAt(this.mesh.position.clone().add(new THREE.Vector3(1, 0, 0)));
+
+                    if (this === selected) {
+                        this.mesh.children.forEach(child => {
+                            if (child.material) child.material.emissiveIntensity = 1.5;
+                        });
+                    }
+                }
+
+                think(organisms) {
+                    if (this.type === 'plant' || !this.brain) return;
+
+                    let nearestFood = Infinity, nearestPredator = Infinity, nearestPrey = Infinity;
+                    let nearestHumanoid = Infinity;
+
+                    for (const o of organisms) {
+                        if (o === this || o.dead) continue;
+                        const dist = this.position.distanceTo(o.position);
+
+                        if (this.type === 'herbivore') {
+                            if (o.type === 'plant' && dist < nearestFood) nearestFood = dist;
+                            if (o.type === 'carnivore' && dist < nearestPredator) nearestPredator = dist;
+                        } else if (this.type === 'carnivore') {
+                            if (o.type === 'herbivore' && dist < nearestPrey) nearestPrey = dist;
+                            if (o.type === 'humanoid' && dist < nearestPrey) nearestPrey = dist;
+                        } else if (this.type === 'humanoid') {
+                            if (o.type === 'plant' && dist < nearestFood) nearestFood = dist;
+                            if (o.type === 'carnivore' && dist < nearestPredator) nearestPredator = dist;
+                            if (o.type === 'humanoid' && dist < nearestHumanoid) nearestHumanoid = dist;
+                        }
+                    }
+
+                    const inputs = [
+                        this.energy / 100,
+                        this.health / 100,
+                        1 - Math.min(nearestFood / 40, 1),
+                        1 - Math.min(nearestPredator / 40, 1),
+                        1 - Math.min(nearestPrey / 40, 1),
+                        this.type === 'humanoid' ? 1 - Math.min(nearestHumanoid / 40, 1) : 0
+                    ];
+
+                    const output = this.brain.think(inputs);
+
+                    // Move tangent to sphere surface
+                    const normal = this.position.clone().normalize();
+                    const tangent = new THREE.Vector3(
+                        Math.random() - 0.5,
+                        Math.random() - 0.5,
+                        Math.random() - 0.5
+                    );
+                    tangent.sub(normal.clone().multiplyScalar(tangent.dot(normal)));
+                    tangent.normalize();
+
+                    this.velocity.copy(tangent.multiplyScalar(output * this.speed));
+                }
+
+                update(delta, organisms) {
+                    if (this.dead) return;
+
+                    this.age += delta;
+                    this.energy -= delta * 0.35;
+                    this.reproduceTimer += delta;
+
+                    if (this.type !== 'plant') {
+                        this.think(organisms);
+                        this.position.add(this.velocity);
+                        this.position.normalize().multiplyScalar(PLANET_RADIUS);
+                        this.energy -= this.velocity.length() * 1.2;
+                    } else {
+                        this.energy += delta * 0.5;
+                        this.energy = Math.min(this.energy, 100);
+                    }
+
+                    if (this.energy <= 0 || this.health <= 0 || this.age > 500) {
+                        this.die();
+                    }
+
+                    this.updateMeshPosition();
+                }
+
+                eat(food) {
+                    this.energy += 45;
+                    this.energy = Math.min(this.energy, 100);
+                    food.die();
+                }
+
+                die() {
+                    this.dead = true;
+                    if (this.mesh) {
+                        this.mesh.traverse(child => {
+                            if (child.material) {
+                                child.material.transparent = true;
+                                child.material.opacity = 0.15;
+                            }
+                        });
+                    }
+                }
+
+                canReproduce() {
+                    return !this.dead && this.energy > 80 && this.health > 60 && this.reproduceTimer > 50;
+                }
+
+                reproduce() {
+                    this.energy -= 40;
+                    this.reproduceTimer = 0;
+
+                    const childBrain = this.brain ? this.brain.clone() : null;
+                    if (childBrain) childBrain.mutate();
+
+                    const offset = new THREE.Vector3(
+                        Math.random() - 0.5,
+                        Math.random() - 0.5,
+                        Math.random() - 0.5
+                    ).multiplyScalar(4);
+
+                    const child = new Organism(this.type, this.position.clone().add(offset));
+                    child.generation = this.generation + 1;
+                    child.brain = childBrain;
+
+                    return child;
+                }
+            }
+
+            // Spawn organisms intelligently based on terrain
+            function spawnOrganism(type, count = 1) {
+                for (let i = 0; i < count; i++) {
+                    let attempts = 0;
+                    let validPos = null;
+
+                    while (attempts < 50 && !validPos) {
+                        const theta = Math.random() * Math.PI * 2;
+                        const phi = Math.random() * Math.PI;
+                        const pos = new THREE.Vector3(
+                            Math.sin(phi) * Math.cos(theta),
+                            Math.cos(phi),
+                            Math.sin(phi) * Math.sin(theta)
+                        ).multiplyScalar(PLANET_RADIUS);
+
+                        const idx = Math.floor(Math.random() * terrainData.length);
+                        const terrain = terrainData[idx];
+
+                        // Intelligent placement
+                        if (type === 'plant' && terrain.height >= 0 && terrain.height < 6) {
+                            validPos = pos;
+                        } else if (type === 'herbivore' && terrain.height >= 0.5 && terrain.height < 5) {
+                            validPos = pos;
+                        } else if (type === 'carnivore' && terrain.height >= 0 && terrain.height < 7) {
+                            validPos = pos;
+                        } else if (type === 'humanoid' && terrain.height >= 0.5 && terrain.height < 4 && Math.abs(terrain.latitude) < 0.6) {
+                            validPos = pos;
+                        }
+
+                        attempts++;
+                    }
+
+                    if (validPos) {
+                        organisms.push(new Organism(type, validPos));
+                    }
+                }
+            }
+
+            function updateEcosystem(delta) {
+                for (const o of organisms) o.update(delta, organisms);
+
+                // Eating
+                for (const o of organisms) {
+                    if (o.dead) continue;
+
+                    if (o.type === 'herbivore' || o.type === 'humanoid') {
+                        for (const other of organisms) {
+                            if (other.type === 'plant' && !other.dead && o.position.distanceTo(other.position) < 4) {
+                                o.eat(other);
+                                break;
+                            }
+                        }
+                    }
+
+                    if (o.type === 'carnivore') {
+                        for (const other of organisms) {
+                            if ((other.type === 'herbivore' || other.type === 'humanoid') &&
+                                !other.dead && o.position.distanceTo(other.position) < 4) {
+                                o.eat(other);
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // Reproduction
+                for (const o of organisms) {
+                    if (o.canReproduce()) {
+                        organisms.push(o.reproduce());
+                    }
+                }
+
+                // Cleanup
+                for (let i = organisms.length - 1; i >= 0; i--) {
+                    if (organisms[i].dead && organisms[i].age > 510) {
+                        if (organisms[i].mesh) planetGroup.remove(organisms[i].mesh);
+                        if (selected === organisms[i]) {
+                            selected = null;
+                            document.getElementById('info').classList.remove('show');
+                        }
+                        organisms.splice(i, 1);
+                    }
+                }
+            }
+
+            // Camera controls
+            let cameraAngle = 0, cameraDistance = 140, cameraHeight = 60;
+            let isDragging = false, prevX = 0, prevY = 0;
+
+            renderer.domElement.addEventListener('mousedown', e => {
+                isDragging = true;
+                prevX = e.clientX;
+                prevY = e.clientY;
+            });
+
+            renderer.domElement.addEventListener('mousemove', e => {
+                if (isDragging) {
+                    cameraAngle -= (e.clientX - prevX) * 0.005;
+                    cameraHeight += (e.clientY - prevY) * 0.5;
+                    cameraHeight = Math.max(-80, Math.min(100, cameraHeight));
+                    prevX = e.clientX;
+                    prevY = e.clientY;
+                }
+            });
+
+            renderer.domElement.addEventListener('mouseup', () => isDragging = false);
+
+            renderer.domElement.addEventListener('wheel', e => {
+                e.preventDefault();
+                cameraDistance += e.deltaY * 0.1;
+                cameraDistance = Math.max(80, Math.min(250, cameraDistance));
+            });
+
+            // Click to select
+            const raycaster = new THREE.Raycaster();
+            const mouse = new THREE.Vector2();
+
+            renderer.domElement.addEventListener('click', e => {
+                if (isDragging) return;
+
+                mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+                mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+                raycaster.setFromCamera(mouse, camera);
+                const intersects = raycaster.intersectObjects(planetGroup.children, true);
+
+                for (const hit of intersects) {
+                    if (hit.object.parent && hit.object.parent.userData.organism) {
+                        selected = hit.object.parent.userData.organism;
+                        updateInfo();
+                        break;
+                    }
+                }
+            });
+
+            function updateInfo() {
+                if (!selected || selected.dead) {
+                    document.getElementById('info').classList.remove('show');
+                    return;
+                }
+
+                document.getElementById('info').classList.add('show');
+                const typeIcons = { plant: '🌳', herbivore: '🦌', carnivore: '🦁', humanoid: '👤' };
+                document.getElementById('creature-info').innerHTML = `
+                    <div style="margin-bottom: 0.8rem; font-size: 1.2rem;">
+                        ${typeIcons[selected.type]} ${selected.type.toUpperCase()} #${selected.id}
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Generation</span>
+                        <span class="stat-value">${selected.generation}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Age</span>
+                        <span class="stat-value">${Math.floor(selected.age)}s</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Energy</span>
+                        <span class="stat-value">${Math.floor(selected.energy)}%</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Health</span>
+                        <span class="stat-value">${Math.floor(selected.health)}%</span>
+                    </div>
+                    ${selected.type === 'humanoid' ? `
+                    <div class="stat-row">
+                        <span class="stat-label">Intelligence</span>
+                        <span class="stat-value">${selected.intelligence}</span>
+                    </div>` : ''}
+                `;
+            }
+
+            function updateUI() {
+                document.getElementById('plant-count').textContent = organisms.filter(o => o.type === 'plant' && !o.dead).length;
+                document.getElementById('herbivore-count').textContent = organisms.filter(o => o.type === 'herbivore' && !o.dead).length;
+                document.getElementById('carnivore-count').textContent = organisms.filter(o => o.type === 'carnivore' && !o.dead).length;
+                document.getElementById('humanoid-count').textContent = organisms.filter(o => o.type === 'humanoid' && !o.dead).length;
+                document.getElementById('day-count').textContent = Math.floor(state.time / 60);
+
+                if (selected && !selected.dead) updateInfo();
+            }
+
+            const state = { time: 0, paused: false, speed: 1 };
+
+            document.getElementById('btn-pause').onclick = () => {
+                state.paused = !state.paused;
+                document.getElementById('btn-pause').textContent = state.paused ? '▶ Play' : '⏸ Pause';
+            };
+
+            document.getElementById('btn-speed').onclick = () => {
+                const speeds = [1, 2, 5];
+                state.speed = speeds[(speeds.indexOf(state.speed) + 1) % speeds.length];
+                document.getElementById('btn-speed').textContent = `⏩ ${state.speed}x`;
+            };
+
+            document.getElementById('btn-evolve').onclick = () => {
+                for (const o of organisms) {
+                    if (o.brain && !o.dead) {
+                        o.brain.mutate();
+                        o.generation++;
+                    }
+                }
+                showNotification('⚡ Evolution boost applied to all creatures!');
+            };
+
+            document.getElementById('btn-spawn-plants').onclick = () => {
+                spawnOrganism('plant', 8);
+                showNotification('🌳 8 new plants spawned');
+            };
+
+            document.getElementById('btn-spawn-herbivores').onclick = () => {
+                spawnOrganism('herbivore', 4);
+                showNotification('🦌 4 new herbivores spawned');
+            };
+
+            document.getElementById('btn-spawn-carnivores').onclick = () => {
+                spawnOrganism('carnivore', 2);
+                showNotification('🦁 2 new carnivores spawned');
+            };
+
+            document.getElementById('btn-spawn-humanoids').onclick = () => {
+                spawnOrganism('humanoid', 2);
+                showNotification('👤 2 new humanoids spawned');
+            };
+
+            // Initial ecosystem
+            spawnOrganism('plant', 35);
+            spawnOrganism('herbivore', 10);
+            spawnOrganism('carnivore', 3);
+            spawnOrganism('humanoid', 2);
+
+            showNotification(`🌍 Planet Eden initialized with ${organisms.length} organisms`);
+
+            let lastTime = performance.now();
+
+            function animate() {
+                requestAnimationFrame(animate);
+
+                const currentTime = performance.now();
+                const delta = ((currentTime - lastTime) / 1000) * state.speed;
+                lastTime = currentTime;
+
+                if (!state.paused) {
+                    state.time += delta;
+                    planetGroup.rotation.y += 0.0002 * delta;
+                    updateEcosystem(delta);
+                }
+
+                camera.position.x = Math.cos(cameraAngle) * cameraDistance;
+                camera.position.z = Math.sin(cameraAngle) * cameraDistance;
+                camera.position.y = cameraHeight;
+                camera.lookAt(planetGroup.position);
+
+                updateUI();
+                renderer.render(scene, camera);
+            }
+
+            animate();
+
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+        }
+    </script>
+</body>
+</html>

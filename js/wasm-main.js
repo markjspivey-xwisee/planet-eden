@@ -11,6 +11,11 @@ import { ParticleSystem } from './engine/particles.js';
 import { goalSystem } from './engine/goals.js';
 import { ScreenshotSystem } from './engine/screenshot.js';
 import { sparklineGraph, SparklineGraph } from './engine/sparkline.js';
+import { helpSystem } from './engine/help.js';
+import { loadingScreen } from './engine/loading.js';
+import { settingsSystem } from './engine/settings.js';
+import { saveSystem } from './engine/savesystem.js';
+import { uiAnimations } from './engine/uianimations.js';
 
 class PlanetEdenWasm {
     constructor() {
@@ -30,15 +35,25 @@ class PlanetEdenWasm {
         this.goalSystem = goalSystem;
         this.screenshotSystem = null;
         this.sparkline = sparklineGraph;
+        this.helpSystem = helpSystem;
+        this.loadingScreen = loadingScreen;
+        this.settingsSystem = settingsSystem;
+        this.saveSystem = saveSystem;
+        this.uiAnimations = uiAnimations;
     }
 
     async init() {
         console.log('[Planet Eden WASM] 🌍 Initializing tribal civilization simulator...');
 
+        // Initialize loading screen first
+        this.loadingScreen.init();
+        this.loadingScreen.setProgress(5, 'Starting up...');
+
         this.loadingElement = document.getElementById('loading');
 
         // Load WASM module
         console.log('[Planet Eden WASM] Loading WASM module...');
+        this.loadingScreen.setProgress(10, 'Loading simulation engine...');
         const loaded = await this.wasmModule.load();
         if (!loaded) {
             console.error('[Planet Eden WASM] ❌ Failed to load WASM module');
@@ -46,10 +61,12 @@ class PlanetEdenWasm {
             return false;
         }
         console.log('[Planet Eden WASM] ✅ WASM module loaded');
+        this.loadingScreen.setProgress(25, 'Simulation engine loaded');
 
         // Initialize simulation - plants don't use neural nets so we can have many more
         // Animals need ~1.6KB each for brain, plants are cheap (~64 bytes)
         console.log('[Planet Eden WASM] Initializing simulation with 500 max organisms...');
+        this.loadingScreen.setProgress(30, 'Initializing world...');
         const initialized = this.wasmModule.init(500, Date.now() & 0xFFFFFFFF);
         if (!initialized) {
             console.error('[Planet Eden WASM] ❌ Failed to initialize simulation');
@@ -57,21 +74,27 @@ class PlanetEdenWasm {
             return false;
         }
         console.log('[Planet Eden WASM] ✅ Simulation initialized');
+        this.loadingScreen.setProgress(40, 'World initialized');
 
         // Create renderer
         console.log('[Planet Eden WASM] Initializing 3D renderer...');
+        this.loadingScreen.setProgress(45, 'Creating 3D environment...');
         this.renderer = new Renderer(this.wasmModule);
         this.renderer.init(document.body);
         console.log('[Planet Eden WASM] ✅ Renderer initialized');
+        this.loadingScreen.setProgress(60, '3D environment ready');
 
         // Create UI
         console.log('[Planet Eden WASM] Initializing enhanced UI...');
+        this.loadingScreen.setProgress(65, 'Building interface...');
         this.ui = new WasmUI(this.wasmModule, this.renderer);
         this.ui.init();
         console.log('[Planet Eden WASM] ✅ UI initialized');
+        this.loadingScreen.setProgress(70, 'Interface ready');
 
         // Initialize feature systems
         console.log('[Planet Eden WASM] Initializing feature systems...');
+        this.loadingScreen.setProgress(75, 'Loading audio system...');
 
         // Event/Toast system
         this.eventSystem.init();
@@ -83,8 +106,16 @@ class PlanetEdenWasm {
         this.particleSystem = new ParticleSystem(this.renderer.scene);
         this.particleSystem.init();
 
-        // Goals/Milestones system
-        this.goalSystem.init(this.eventSystem, this.audioSystem);
+        // Connect particle system to renderer for birth/death effects
+        this.renderer.setParticleSystem(this.particleSystem);
+
+        // Connect audio system to renderer for weather sounds
+        this.renderer.setAudioSystem(this.audioSystem);
+
+        this.loadingScreen.setProgress(80, 'Initializing effects...');
+
+        // Goals/Milestones system (with particle celebration effects)
+        this.goalSystem.init(this.eventSystem, this.audioSystem, this.particleSystem);
 
         // Screenshot system
         this.screenshotSystem = new ScreenshotSystem(this.renderer);
@@ -93,13 +124,29 @@ class PlanetEdenWasm {
         // Population sparkline graph
         this.sparkline.init();
 
+        // Help system (? key shortcut)
+        helpSystem.init();
+
+        // Settings system
+        this.settingsSystem.init();
+        this.settingsSystem.onSettingsChange = (settings) => this.applySettings(settings);
+
+        // Save system
+        this.saveSystem.init(this.wasmModule, this.renderer, this.eventSystem);
+
+        // UI Animations
+        this.uiAnimations.init();
+        this.uiAnimations.setAudioSystem(this.audioSystem);
+
         console.log('[Planet Eden WASM] ✅ Feature systems initialized');
 
         // Setup pause overlay
         this.pauseOverlay = document.getElementById('pause-overlay');
 
         // Spawn initial world
+        this.loadingScreen.setProgress(85, 'Populating ecosystem...');
         this.spawnInitialWorld();
+        this.loadingScreen.setProgress(95, 'Finalizing world...');
 
         // Setup keyboard controls
         this.setupControls();
@@ -107,10 +154,11 @@ class PlanetEdenWasm {
         // Auto-start the simulation
         this.start();
 
-        // Hide loading screen
-        setTimeout(() => {
+        // Hide loading screens (both old and new)
+        this.loadingScreen.hide();
+        if (this.loadingElement) {
             this.loadingElement.classList.add('hidden');
-        }, 1000);
+        }
 
         console.log('[Planet Eden WASM] 🎉 Initialization complete!');
         console.log('[Planet Eden WASM] ✅ Simulation auto-started!');
@@ -278,6 +326,13 @@ class PlanetEdenWasm {
 
                 // Note: L, M, P, G, O are handled by their respective systems
                 // L = Event log, M = Mute/Audio, P = Screenshot, G = Graph, O = Objectives
+
+                // Settings menu (Escape key)
+                case 'Escape':
+                    if (!this.settingsSystem.visible) {
+                        this.settingsSystem.show();
+                    }
+                    break;
             }
         });
 
@@ -322,6 +377,7 @@ class PlanetEdenWasm {
         console.log('📋 PANELS');
         console.log('  T           - Toggle tribes panel');
         console.log('  H           - Toggle help panels');
+        console.log('  ?           - Show keyboard shortcuts');
         console.log('');
         console.log('═══════════════════════════════════════════════════');
         console.log('');
@@ -359,6 +415,62 @@ class PlanetEdenWasm {
         console.log('');
         console.log('═══════════════════════════════════════════════════');
         console.log('');
+    }
+
+    applySettings(settings) {
+        console.log('[Planet Eden WASM] Applying settings...');
+
+        // Apply graphics settings
+        if (this.renderer) {
+            // Shadows
+            if (this.renderer.renderer) {
+                this.renderer.renderer.shadowMap.enabled = settings.graphics.shadows;
+            }
+
+            // Update all shadow-casting lights if shadows toggled
+            if (this.renderer.sunLight) {
+                this.renderer.sunLight.castShadow = settings.graphics.shadows;
+            }
+        }
+
+        // Apply particle settings
+        if (this.particleSystem) {
+            // Could add enable/disable for particles
+            this.particleSystem.maxParticles = settings.graphics.particles ? 500 : 0;
+        }
+
+        // Apply audio settings
+        if (this.audioSystem) {
+            this.audioSystem.setMasterVolume(settings.audio.master);
+            this.audioSystem.setSfxVolume(settings.audio.sfx);
+            this.audioSystem.setAmbientVolume(settings.audio.ambient);
+        }
+
+        // Apply gameplay settings
+        this.timeScale = settings.gameplay.timeScale;
+
+        // Update UI to reflect new time scale
+        const timeSlider = document.getElementById('time-scale-slider');
+        const timeValue = document.getElementById('time-scale-value');
+        if (timeSlider) timeSlider.value = this.timeScale;
+        if (timeValue) timeValue.textContent = `${this.timeScale.toFixed(1)}x`;
+
+        // Apply display settings
+        if (this.ui) {
+            // Show/hide FPS counter
+            const fpsDisplay = document.getElementById('fps-display');
+            if (fpsDisplay) {
+                fpsDisplay.style.display = settings.display.showFPS ? 'block' : 'none';
+            }
+
+            // Show/hide stats panel
+            const statsPanel = document.getElementById('stats-panel');
+            if (statsPanel) {
+                statsPanel.style.display = settings.display.showStats ? 'block' : 'none';
+            }
+        }
+
+        console.log('[Planet Eden WASM] Settings applied');
     }
 
     start() {
@@ -404,10 +516,16 @@ class PlanetEdenWasm {
     }
 
     togglePanel(panelId) {
-        const panel = document.getElementById(panelId);
-        if (panel) {
-            const isHidden = panel.style.display === 'none' || !panel.style.display;
-            panel.style.display = isHidden ? 'block' : 'none';
+        // Use animated toggle if UI animations system is available
+        if (this.uiAnimations) {
+            this.uiAnimations.togglePanel(panelId);
+        } else {
+            // Fallback to simple toggle
+            const panel = document.getElementById(panelId);
+            if (panel) {
+                const isHidden = panel.style.display === 'none' || !panel.style.display;
+                panel.style.display = isHidden ? 'block' : 'none';
+            }
         }
     }
 

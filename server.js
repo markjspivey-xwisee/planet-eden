@@ -10,6 +10,7 @@ const mimeTypes = {
     '.js': 'text/javascript',
     '.css': 'text/css',
     '.json': 'application/json',
+    '.wasm': 'application/wasm',
     '.png': 'image/png',
     '.jpg': 'image/jpg',
     '.gif': 'image/gif',

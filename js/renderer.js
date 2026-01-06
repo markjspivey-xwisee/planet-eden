@@ -29,7 +29,15 @@ export class Renderer {
         this.followMode = false;
         this.followTarget = null;
         this.followOffset = new THREE.Vector3(0, 10, 20); // Camera offset from target
-        this.followLerp = 0.05; // Smoothing factor
+        this.followLerp = 0.05; // Base smoothing factor
+        this.followLastTargetPos = null; // For velocity tracking
+        this.followVelocity = new THREE.Vector3(); // Target velocity for prediction
+
+        // Particle system reference (set via setParticleSystem)
+        this.particleSystem = null;
+
+        // Audio system reference (set via setAudioSystem)
+        this.audioSystem = null;
 
         // Activity tracking for humanoids
         this.humanoidActivities = new Map(); // id -> { activity, target, progress, effects }
@@ -262,6 +270,18 @@ export class Renderer {
         this.moonLight = new THREE.DirectionalLight(0x6688cc, 0.2);
         this.moonLight.position.set(-SUN_ORBIT_RADIUS, 0, 0);
         this.scene.add(this.moonLight);
+    }
+
+    // Set particle system reference for birth/death effects
+    setParticleSystem(particleSystem) {
+        this.particleSystem = particleSystem;
+        console.log('[Renderer] Particle system connected for life events');
+    }
+
+    // Set audio system reference for weather sounds
+    setAudioSystem(audioSystem) {
+        this.audioSystem = audioSystem;
+        console.log('[Renderer] Audio system connected for weather sounds');
     }
 
     createPlanet() {
@@ -625,6 +645,11 @@ export class Renderer {
         this.weatherSystem.onWeatherChange = (weather) => {
             console.log(`[Weather] Changed to: ${weather}`);
             this.updateWeatherDisplay(weather);
+
+            // Notify audio system of weather change
+            if (this.audioSystem) {
+                this.audioSystem.setWeather(weather);
+            }
         };
 
         // Set up lightning strike callback
@@ -1097,17 +1122,54 @@ export class Renderer {
         const mesh = this.organisms.get(id);
 
         if (mesh) {
-            // Add selection ring
-            const ringGeometry = new THREE.RingGeometry(1.5, 1.8, 32);
+            // Create selection group to hold all selection effects
+            this.selectionGroup = new THREE.Group();
+            this.selectionGroup.userData.isSelectionEffect = true;
+
+            // Outer glow ring (pulsing)
+            const outerRingGeometry = new THREE.RingGeometry(2.0, 2.3, 48);
+            const outerRingMaterial = new THREE.MeshBasicMaterial({
+                color: 0x00ff00,
+                side: THREE.DoubleSide,
+                transparent: true,
+                opacity: 0.4
+            });
+            this.selectionOuterRing = new THREE.Mesh(outerRingGeometry, outerRingMaterial);
+            this.selectionOuterRing.rotation.x = Math.PI / 2;
+            this.selectionGroup.add(this.selectionOuterRing);
+
+            // Inner selection ring
+            const ringGeometry = new THREE.RingGeometry(1.5, 1.7, 48);
             const ringMaterial = new THREE.MeshBasicMaterial({
                 color: 0x00ff00,
                 side: THREE.DoubleSide,
                 transparent: true,
-                opacity: 0.8
+                opacity: 0.9
             });
             this.selectionRing = new THREE.Mesh(ringGeometry, ringMaterial);
             this.selectionRing.rotation.x = Math.PI / 2;
-            mesh.add(this.selectionRing);
+            this.selectionGroup.add(this.selectionRing);
+
+            // Add subtle point light for glow effect
+            this.selectionLight = new THREE.PointLight(0x00ff00, 0.5, 5);
+            this.selectionLight.position.y = 1;
+            this.selectionGroup.add(this.selectionLight);
+
+            // Vertical beam effect
+            const beamGeometry = new THREE.CylinderGeometry(0.05, 0.05, 8, 8);
+            const beamMaterial = new THREE.MeshBasicMaterial({
+                color: 0x00ff00,
+                transparent: true,
+                opacity: 0.3
+            });
+            this.selectionBeam = new THREE.Mesh(beamGeometry, beamMaterial);
+            this.selectionBeam.position.y = 4;
+            this.selectionGroup.add(this.selectionBeam);
+
+            // Store animation state
+            this.selectionGroup.userData.pulseTime = 0;
+
+            mesh.add(this.selectionGroup);
 
             // Show neural network panel
             this.showNeuralNetworkPanel(id);
@@ -1115,12 +1177,55 @@ export class Renderer {
     }
 
     deselectOrganism() {
-        if (this.selectionRing) {
-            this.selectionRing.parent.remove(this.selectionRing);
-            this.selectionRing = null;
+        // Remove selection group (contains all effects)
+        if (this.selectionGroup && this.selectionGroup.parent) {
+            this.selectionGroup.parent.remove(this.selectionGroup);
         }
+        this.selectionGroup = null;
+        this.selectionRing = null;
+        this.selectionOuterRing = null;
+        this.selectionLight = null;
+        this.selectionBeam = null;
+
         this.selectedOrganism = null;
         this.hideNeuralNetworkPanel();
+    }
+
+    // Update selection effect animation (called from render loop)
+    updateSelectionEffect(deltaMs) {
+        if (!this.selectionGroup) return;
+
+        // Update pulse animation
+        this.selectionGroup.userData.pulseTime += deltaMs * 0.003;
+        const pulse = Math.sin(this.selectionGroup.userData.pulseTime) * 0.5 + 0.5;
+
+        // Pulse outer ring opacity and scale
+        if (this.selectionOuterRing) {
+            this.selectionOuterRing.material.opacity = 0.2 + pulse * 0.3;
+            const scale = 1 + pulse * 0.15;
+            this.selectionOuterRing.scale.set(scale, scale, 1);
+        }
+
+        // Pulse inner ring opacity slightly
+        if (this.selectionRing) {
+            this.selectionRing.material.opacity = 0.7 + pulse * 0.3;
+        }
+
+        // Pulse light intensity
+        if (this.selectionLight) {
+            this.selectionLight.intensity = 0.3 + pulse * 0.4;
+        }
+
+        // Subtle beam animation
+        if (this.selectionBeam) {
+            this.selectionBeam.material.opacity = 0.15 + pulse * 0.2;
+            this.selectionBeam.rotation.y += deltaMs * 0.001;
+        }
+
+        // Slowly rotate the selection rings
+        if (this.selectionGroup) {
+            this.selectionGroup.rotation.y += deltaMs * 0.0005;
+        }
     }
 
     selectBuilding(buildingId) {
@@ -1930,12 +2035,14 @@ export class Renderer {
                 mesh = null;
             }
 
+            let isNewOrganism = false;
             if (!mesh) {
                 mesh = this.createOrganismMesh(orgType);
                 mesh.userData.organismId = id;
                 mesh.userData.organismType = orgType;
                 this.organisms.set(id, mesh);
                 this.planetGroup.add(mesh);
+                isNewOrganism = true;
 
                 // Initialize animation state
                 this.animationSystem.initAnimationState(id, orgType);
@@ -2100,6 +2207,48 @@ export class Renderer {
             const health = data.healths ? data.healths[i] : 100;
             const healthScale = 0.8 + (health / 100) * 0.4; // 0.8 to 1.2 scale
             mesh.scale.setScalar(ORGANISM_SCALE * healthScale);
+
+            // Update tribe color indicators for humanoids
+            if (orgType === 3) {
+                const tribeId = data.tribeIds[i];
+                const hasTribe = tribeId !== 0xFFFFFFFF && tribeId < 0xFFFFFFFF;
+
+                // Update tribe indicator visibility and color
+                mesh.traverse((child) => {
+                    if (child.userData && child.userData.isTribeIndicator) {
+                        child.visible = hasTribe;
+
+                        if (hasTribe && child.material) {
+                            // Get tribe color from WASM module
+                            const tribeData = this.wasmModule.getTribeData(tribeId);
+                            if (tribeData && tribeData.color) {
+                                const color = new THREE.Color(
+                                    tribeData.color.r / 255,
+                                    tribeData.color.g / 255,
+                                    tribeData.color.b / 255
+                                );
+                                child.material.color.copy(color);
+                                child.material.emissive.copy(color).multiplyScalar(0.3);
+                            } else {
+                                // Fallback - generate color from tribeId
+                                const hue = (tribeId * 0.618033988749895) % 1;
+                                const color = new THREE.Color().setHSL(hue, 0.8, 0.5);
+                                child.material.color.copy(color);
+                                child.material.emissive.copy(color).multiplyScalar(0.3);
+                            }
+                        }
+                    }
+                });
+
+                // Store tribeId in userData for UI/selection purposes
+                mesh.userData.tribeId = tribeId;
+            }
+
+            // Emit birth particles for newly created organisms (skip plants to reduce particle spam)
+            if (isNewOrganism && this.particleSystem && orgType !== 0) {
+                const pos = mesh.position;
+                this.particleSystem.emitBirth(pos.x, pos.y, pos.z, orgType);
+            }
         }
 
         // Update humanoid behaviors (chopping, mining, building)
@@ -3474,6 +3623,39 @@ export class Renderer {
                 legPivot.add(leg);
                 group.add(legPivot);
             }
+
+            // Tribe color headband - colored band around forehead
+            const headband = new THREE.Mesh(
+                new THREE.TorusGeometry(0.38, 0.06, 8, 24),
+                new THREE.MeshStandardMaterial({
+                    color: 0x888888, // Default gray - will be updated with tribe color
+                    emissive: 0x222222,
+                    emissiveIntensity: 0.3,
+                    roughness: 0.5,
+                    metalness: 0.3
+                })
+            );
+            headband.position.y = 1.25;
+            headband.rotation.x = Math.PI / 2;
+            headband.userData.isTribeIndicator = true;
+            headband.visible = false; // Hidden until tribe is assigned
+            group.add(headband);
+
+            // Tribe shoulder marking - small colored sphere on shoulder
+            const shoulderMark = new THREE.Mesh(
+                new THREE.SphereGeometry(0.1, 12, 12),
+                new THREE.MeshStandardMaterial({
+                    color: 0x888888,
+                    emissive: 0x444444,
+                    emissiveIntensity: 0.5,
+                    roughness: 0.3,
+                    metalness: 0.5
+                })
+            );
+            shoulderMark.position.set(0.5, 0.9, 0);
+            shoulderMark.userData.isTribeIndicator = true;
+            shoulderMark.visible = false;
+            group.add(shoulderMark);
         } else {
             // UNKNOWN TYPE - Default gray sphere
             console.warn(`[Renderer] Unknown organism type: ${t}`);
@@ -3492,6 +3674,13 @@ export class Renderer {
     removeOrganism(id) {
         const mesh = this.organisms.get(id);
         if (mesh) {
+            // Emit death particles at organism's last position
+            if (this.particleSystem) {
+                const pos = new THREE.Vector3();
+                mesh.getWorldPosition(pos);
+                this.particleSystem.emitDeath(pos.x, pos.y, pos.z);
+            }
+
             this.planetGroup.remove(mesh);
             this.organisms.delete(id);
             this.previousPositions.delete(id);
@@ -3547,9 +3736,30 @@ export class Renderer {
             this.scene.fog.color.copy(timeInfo.fogColor);
         }
 
-        // Update ambient light
+        // Update ambient light with time-of-day color grading (AAA quality)
         if (this.ambientLight) {
             this.ambientLight.intensity = timeInfo.ambientIntensity;
+
+            // Smooth ambient color based on phase
+            const ambientColors = {
+                night: 0x4466aa,   // Cool blue moonlight
+                dawn: 0x9977aa,    // Purple-pink pre-dawn
+                morning: 0xffeedd, // Warm morning light
+                day: 0xffffff,     // Neutral daylight
+                sunset: 0xffaa77,  // Orange-gold sunset
+                dusk: 0x886699     // Purple twilight
+            };
+
+            const targetColor = ambientColors[timeInfo.phase] || 0xffffff;
+
+            // Smooth color interpolation for AAA-quality transitions
+            if (!this.ambientLight.userData.targetColor) {
+                this.ambientLight.userData.targetColor = new THREE.Color(targetColor);
+                this.ambientLight.color.set(targetColor);
+            } else {
+                this.ambientLight.userData.targetColor.setHex(targetColor);
+                this.ambientLight.color.lerp(this.ambientLight.userData.targetColor, 0.02);
+            }
         }
 
         // Stars visibility - more visible at night
@@ -3596,13 +3806,10 @@ export class Renderer {
             }
         }
 
-        // Pulse selection ring
-        if (this.selectionRing) {
-            this.selectionRing.rotation.z += 0.02;
-            this.selectionRing.material.opacity = 0.5 + Math.sin(Date.now() * 0.003) * 0.3;
-        }
+        // Update selection glow effect (AAA-quality pulsing glow)
+        this.updateSelectionEffect(deltaMs);
 
-        // Follow mode camera
+        // Follow mode camera with smooth tracking
         if (this.followMode && this.followTarget) {
             const mesh = this.organisms.get(this.followTarget);
             if (mesh) {
@@ -3610,16 +3817,27 @@ export class Renderer {
                 const targetPos = new THREE.Vector3();
                 mesh.getWorldPosition(targetPos);
 
+                // Calculate velocity for smooth prediction
+                if (this.followLastTargetPos) {
+                    const velocityDelta = targetPos.clone().sub(this.followLastTargetPos);
+                    // Smooth velocity with exponential moving average
+                    this.followVelocity.lerp(velocityDelta, 0.3);
+                }
+                this.followLastTargetPos = targetPos.clone();
+
+                // Predict target position slightly ahead for smoother following
+                const predictedPos = targetPos.clone().add(this.followVelocity.clone().multiplyScalar(2));
+
                 // Calculate proper camera orientation for spherical planet
                 // Up vector is the surface normal (pointing away from planet center)
-                const surfaceNormal = targetPos.clone().normalize();
+                const surfaceNormal = predictedPos.clone().normalize();
 
                 // Calculate camera position: offset along surface normal (up) and back from center
                 const cameraDistance = this.followOffset.z;
                 const cameraHeight = this.followOffset.y;
 
                 // Position camera above and behind the creature (relative to planet surface)
-                const cameraTarget = targetPos.clone()
+                const cameraTarget = predictedPos.clone()
                     .add(surfaceNormal.clone().multiplyScalar(cameraHeight))
                     .add(surfaceNormal.clone().multiplyScalar(cameraDistance * 0.3));
 
@@ -3627,14 +3845,18 @@ export class Renderer {
                 const toPlanetCenter = cameraTarget.clone().normalize();
                 cameraTarget.add(toPlanetCenter.clone().multiplyScalar(cameraDistance * 0.7));
 
-                // Smooth camera movement
-                this.camera.position.lerp(cameraTarget, this.followLerp);
+                // Adaptive lerp - smoother when target is moving fast
+                const speed = this.followVelocity.length();
+                const adaptiveLerp = Math.max(0.02, this.followLerp * (1 - Math.min(speed * 2, 0.5)));
+
+                // Smooth camera movement with adaptive lerp
+                this.camera.position.lerp(cameraTarget, adaptiveLerp);
 
                 // Set camera up vector to surface normal for correct orientation
-                this.camera.up.lerp(surfaceNormal, this.followLerp);
+                this.camera.up.lerp(surfaceNormal, adaptiveLerp * 0.5); // Even smoother for up vector
 
-                // Look at the creature
-                this.controls.target.lerp(targetPos, this.followLerp);
+                // Look at the actual creature position (not predicted) for stability
+                this.controls.target.lerp(targetPos, adaptiveLerp);
             } else {
                 // Target lost, exit follow mode
                 this.exitFollowMode();
@@ -3723,6 +3945,10 @@ export class Renderer {
         this.followTarget = targetId;
         this.controls.enableDamping = false; // Disable for smoother follow
 
+        // Reset velocity tracking for smooth start
+        this.followLastTargetPos = null;
+        this.followVelocity.set(0, 0, 0);
+
         // Show follow indicator
         this.showFollowIndicator(true);
 
@@ -3736,6 +3962,10 @@ export class Renderer {
 
         // Reset camera up vector to world Y
         this.camera.up.set(0, 1, 0);
+
+        // Reset velocity tracking
+        this.followLastTargetPos = null;
+        this.followVelocity.set(0, 0, 0);
 
         // Hide follow indicator
         this.showFollowIndicator(false);
