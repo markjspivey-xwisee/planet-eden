@@ -125,8 +125,8 @@ export class WeatherSystem {
         const rainSystem = this.createCloudRainSystem();
         this.rainGroup.add(rainSystem.points);
 
-        // Randomize initial weather state for diversity
-        const initialStates = ['clear', 'clear', 'clear', 'cloudy', 'cloudy', 'rain'];
+        // Randomize initial weather state for diversity (including storms)
+        const initialStates = ['clear', 'clear', 'cloudy', 'cloudy', 'rain', 'rain', 'storm'];
         const initialState = initialStates[Math.floor(Math.random() * initialStates.length)];
 
         // Stagger state timers so clouds don't all transition together
@@ -146,15 +146,17 @@ export class WeatherSystem {
             ).normalize(),
             // Local weather state - randomized initial state
             weatherState: initialState,
-            weatherIntensity: initialState === 'rain' ? 0.7 : (initialState === 'cloudy' ? 0.3 : 0),
-            targetIntensity: initialState === 'rain' ? 0.7 : (initialState === 'cloudy' ? 0.3 : 0),
+            weatherIntensity: initialState === 'storm' ? 1.0 : (initialState === 'rain' ? 0.7 : (initialState === 'cloudy' ? 0.3 : 0)),
+            targetIntensity: initialState === 'storm' ? 1.0 : (initialState === 'rain' ? 0.7 : (initialState === 'cloudy' ? 0.3 : 0)),
             stateTimer: staggeredTimer,
             stateProgress: Math.random() * 10,
-            // Storm properties
-            canStorm: Math.random() > 0.6,
-            lightningCharge: 0,
-            // Moisture tracking for water cycle
-            moisture: Math.random() * 0.5, // 0-1 moisture content
+            // Storm properties - 75% of clouds can produce storms
+            canStorm: Math.random() > 0.25,
+            lightningCharge: Math.random() * 0.5, // Start with some charge
+
+            // Moisture tracking for water cycle - storms/rain start with more moisture
+            moisture: initialState === 'storm' ? (0.7 + Math.random() * 0.3) :
+                      (initialState === 'rain' ? (0.5 + Math.random() * 0.3) : Math.random() * 0.5),
             isOverWater: false
         };
 
@@ -474,10 +476,18 @@ export class WeatherSystem {
         // Update rain particles (in world space, falling toward planet center)
         this.updateCloudRain(cloud, deltaSeconds);
 
-        // Update lightning charge for storm clouds
+        // Update lightning charge for storm clouds (faster charge, higher trigger chance)
         if (cloud.weatherState === 'storm' && cloud.canStorm) {
-            cloud.lightningCharge += deltaSeconds * 0.1;
-            if (cloud.lightningCharge > 1 && Math.random() < 0.02) {
+            cloud.lightningCharge += deltaSeconds * 0.25; // Faster charge buildup
+            if (cloud.lightningCharge > 1 && Math.random() < 0.08) { // 8% chance per frame when charged
+                this.triggerLightning(cloud);
+                cloud.lightningCharge = 0;
+            }
+        }
+        // Rain clouds can also occasionally produce lightning (less frequently)
+        if (cloud.weatherState === 'rain' && cloud.canStorm && cloud.moisture > 0.7) {
+            cloud.lightningCharge += deltaSeconds * 0.05;
+            if (cloud.lightningCharge > 1.5 && Math.random() < 0.03) {
                 this.triggerLightning(cloud);
                 cloud.lightningCharge = 0;
             }
@@ -498,16 +508,16 @@ export class WeatherSystem {
             }
         } else if (currentState === 'cloudy') {
             const roll = Math.random();
-            // High moisture over land = rain, low moisture = clear
-            if (cloud.moisture > 0.7 && !cloud.isOverWater) {
-                nextState = roll < 0.3 && cloud.canStorm ? 'storm' : 'rain';
+            // High moisture over land = rain or storm
+            if (cloud.moisture > 0.6 && !cloud.isOverWater) {
+                nextState = roll < 0.4 && cloud.canStorm ? 'storm' : 'rain';
             } else if (cloud.moisture < 0.3) {
                 nextState = 'clear';
-            } else if (roll < 0.3) {
+            } else if (roll < 0.2) {
                 nextState = 'clear';
-            } else if (roll < 0.7) {
+            } else if (roll < 0.6) {
                 nextState = cloud.moisture > 0.5 ? 'rain' : 'cloudy';
-            } else if (cloud.canStorm && cloud.moisture > 0.8) {
+            } else if (cloud.canStorm && cloud.moisture > 0.6) {
                 nextState = 'storm';
             } else {
                 nextState = 'cloudy';
@@ -517,15 +527,16 @@ export class WeatherSystem {
             // Low moisture = stop raining
             if (cloud.moisture < 0.3) {
                 nextState = 'cloudy';
-            } else if (roll < 0.3) {
+            } else if (roll < 0.2) {
                 nextState = 'cloudy';
-            } else if (roll < 0.6 && cloud.canStorm && cloud.moisture > 0.7) {
-                nextState = 'storm';
+            } else if (roll < 0.5 && cloud.canStorm && cloud.moisture > 0.5) {
+                nextState = 'storm'; // More likely to escalate to storm
             } else {
                 nextState = 'rain';
             }
         } else if (currentState === 'storm') {
-            nextState = Math.random() > 0.5 ? 'rain' : 'cloudy';
+            // Storms last longer before dissipating
+            nextState = Math.random() > 0.6 ? 'storm' : (Math.random() > 0.5 ? 'rain' : 'cloudy');
         }
 
         cloud.weatherState = nextState;
