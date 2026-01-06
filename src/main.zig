@@ -5,9 +5,9 @@
 const std = @import("std");
 
 // Version export to verify WASM is updated
-// Version: 7 - Land-only spawning, lightning power, more plants
+// Version: 9 - 500 organism capacity, genetic variation, more animals
 export fn getVersion() u32 {
-    return 7;
+    return 9;
 }
 
 const tribe = @import("tribe.zig");

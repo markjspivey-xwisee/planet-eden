@@ -1969,6 +1969,12 @@ export class Renderer {
             // Get terrain info at this position
             let { position, quaternion, isLand } = this.positionOnPlanetSurface(flatX, flatZ, objectHeight);
 
+            // Skip rendering plants that ended up in water (don't render them)
+            if (orgType === 0 && !isLand) {
+                mesh.visible = false;
+                continue;
+            }
+
             // Water avoidance for non-plants: prevent organisms from entering water
             if (orgType !== 0) {
                 let needsPositionUpdate = false;

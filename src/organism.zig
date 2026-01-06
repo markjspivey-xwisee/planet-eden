@@ -131,30 +131,37 @@ pub const Organisms = struct {
         self.velocities_y[idx] = 0;
         self.velocities_z[idx] = 0;
 
-        // Set stats based on type
+        // Set stats based on type with random variation for genetic diversity
         switch (org_type) {
             .plant => {
+                // Plants: no brain, no variation needed (they're environment)
                 self.energies[idx] = 50.0;
                 self.healths[idx] = 30.0;
-                self.sizes[idx] = 0.5;
+                self.sizes[idx] = 0.3 + rng.float() * 0.4; // 0.3-0.7 size variation
                 self.brains[idx] = null; // Plants don't have brains
             },
             .herbivore => {
-                self.energies[idx] = 100.0;
-                self.healths[idx] = 80.0;
-                self.sizes[idx] = 1.0;
+                // Herbivores: variation in size affects energy/health
+                const size_var = 0.8 + rng.float() * 0.4; // 0.8-1.2 multiplier
+                self.energies[idx] = 80.0 + rng.float() * 40.0; // 80-120 starting energy
+                self.healths[idx] = 60.0 + rng.float() * 40.0; // 60-100 health
+                self.sizes[idx] = 1.0 * size_var;
                 self.brains[idx] = try self.createBrain(rng);
             },
             .carnivore => {
-                self.energies[idx] = 120.0;
-                self.healths[idx] = 100.0;
-                self.sizes[idx] = 1.5;
+                // Carnivores: larger variation, some are bigger/stronger
+                const size_var = 0.7 + rng.float() * 0.6; // 0.7-1.3 multiplier
+                self.energies[idx] = 100.0 + rng.float() * 40.0; // 100-140 energy
+                self.healths[idx] = 80.0 + rng.float() * 40.0; // 80-120 health
+                self.sizes[idx] = 1.5 * size_var;
                 self.brains[idx] = try self.createBrain(rng);
             },
             .humanoid => {
-                self.energies[idx] = 100.0;
-                self.healths[idx] = 100.0;
-                self.sizes[idx] = 1.8;
+                // Humanoids: moderate variation, some stronger/weaker
+                const size_var = 0.85 + rng.float() * 0.3; // 0.85-1.15 multiplier
+                self.energies[idx] = 90.0 + rng.float() * 30.0; // 90-120 energy
+                self.healths[idx] = 80.0 + rng.float() * 40.0; // 80-120 health
+                self.sizes[idx] = 1.8 * size_var;
                 self.brains[idx] = try self.createBrain(rng);
             },
         }
@@ -223,8 +230,8 @@ pub const Organisms = struct {
                 self.reproduction_cooldowns[i] -= delta;
             }
 
-            // Drain energy over time
-            self.energies[i] -= delta * 0.5;
+            // Drain energy over time (reduced rate for longer survival)
+            self.energies[i] -= delta * 0.1;
 
             // Die if no energy or health
             if (self.energies[i] <= 0 or self.healths[i] <= 0) {

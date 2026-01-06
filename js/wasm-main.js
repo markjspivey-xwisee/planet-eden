@@ -31,9 +31,10 @@ class PlanetEdenWasm {
         }
         console.log('[Planet Eden WASM] ✅ WASM module loaded');
 
-        // Initialize simulation (capacity limited by memory constraints)
-        console.log('[Planet Eden WASM] Initializing simulation with 50 max organisms...');
-        const initialized = this.wasmModule.init(50, Date.now() & 0xFFFFFFFF);
+        // Initialize simulation - plants don't use neural nets so we can have many more
+        // Animals need ~1.6KB each for brain, plants are cheap (~64 bytes)
+        console.log('[Planet Eden WASM] Initializing simulation with 500 max organisms...');
+        const initialized = this.wasmModule.init(500, Date.now() & 0xFFFFFFFF);
         if (!initialized) {
             console.error('[Planet Eden WASM] ❌ Failed to initialize simulation');
             this.showError('Failed to initialize simulation. Check console for details.');
@@ -103,28 +104,28 @@ class PlanetEdenWasm {
             return false;
         };
 
-        // Spawn abundant vegetation (150 plants/trees) - only on land
+        // Spawn abundant vegetation (300 plants/trees) - only on land
         // Plants can reproduce via seeding, so a good starting forest is important
         let plantCount = 0;
-        for (let i = 0; i < 150; i++) {
+        for (let i = 0; i < 300; i++) {
             if (spawnOnLand(OrganismType.PLANT, NO_TRIBE)) plantCount++;
         }
 
-        // Spawn herbivores (15 animals) - belong to tribe1, only on land
+        // Spawn herbivores (25 animals) - wild grazing herds, only on land
         let herbCount = 0;
-        for (let i = 0; i < 15; i++) {
-            if (spawnOnLand(OrganismType.HERBIVORE, tribe1)) herbCount++;
+        for (let i = 0; i < 25; i++) {
+            if (spawnOnLand(OrganismType.HERBIVORE, NO_TRIBE)) herbCount++;
         }
 
-        // Spawn carnivores (5 predators) - wild, only on land
+        // Spawn carnivores (8 predators) - wild hunters, only on land
         let carnCount = 0;
-        for (let i = 0; i < 5; i++) {
+        for (let i = 0; i < 8; i++) {
             if (spawnOnLand(OrganismType.CARNIVORE, NO_TRIBE)) carnCount++;
         }
 
-        // Spawn first tribe members (8 humanoids) - only on land
+        // Spawn first tribe members (12 humanoids) - only on land
         let humanCount = 0;
-        for (let i = 0; i < 8; i++) {
+        for (let i = 0; i < 12; i++) {
             if (spawnOnLand(OrganismType.HUMANOID, tribe1)) humanCount++;
         }
 

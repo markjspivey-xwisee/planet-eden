@@ -29,8 +29,9 @@ pub const Simulation = struct {
 
     /// Initialize simulation
     pub fn init(allocator: std.mem.Allocator, seed: u32, max_organisms: usize) !Simulation {
-        // Limit capacities to fit in constrained memory
-        const org_cap = @min(max_organisms, 50);
+        // Limit capacities - plants are cheap (no neural net), animals need ~1.6KB each for brain
+        // With 512KB buffer, we can handle ~500 organisms (most being plants)
+        const org_cap = @min(max_organisms, 500);
 
         // Build piece by piece to avoid large stack frame
         var sim: Simulation = undefined;
