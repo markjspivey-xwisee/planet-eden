@@ -165,6 +165,9 @@ export class EventSystem {
     }
 
     displayToast(event) {
+        // Skip if container doesn't exist (new HUD mode)
+        if (!this.container) return;
+
         const toast = document.createElement('div');
         const bgColor = event.priority === 'milestone' ? 'rgba(255, 215, 0, 0.15)' : 'rgba(0, 0, 0, 0.9)';
         const borderColor = event.priority === 'milestone' ? '#ffd700' : 'rgba(100, 200, 100, 0.5)';
