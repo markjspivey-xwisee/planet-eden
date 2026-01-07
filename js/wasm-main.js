@@ -84,69 +84,180 @@ class PlanetEdenWasm {
         // Create renderer
         console.log('[Planet Eden WASM] Initializing 3D renderer...');
         this.loadingScreen.setProgress(45, 'Creating 3D environment...');
-        this.renderer = new Renderer(this.wasmModule);
-        this.renderer.init(document.body);
-        console.log('[Planet Eden WASM] ✅ Renderer initialized');
-        this.loadingScreen.setProgress(60, '3D environment ready');
+        try {
+            this.renderer = new Renderer(this.wasmModule);
+            this.renderer.init(document.body);
+            console.log('[Planet Eden WASM] ✅ Renderer initialized');
+            this.loadingScreen.setProgress(60, '3D environment ready');
+        } catch (error) {
+            console.error('[Planet Eden WASM] ❌ Failed to initialize renderer:', error);
+            this.loadingScreen.setProgress(45, 'Renderer initialization failed');
+            this.showError(`Failed to initialize 3D renderer: ${error.message}`);
+            return false;
+        }
 
         // Create UI
         console.log('[Planet Eden WASM] Initializing enhanced UI...');
         this.loadingScreen.setProgress(65, 'Building interface...');
-        this.ui = new WasmUI(this.wasmModule, this.renderer);
-        this.ui.init();
-        console.log('[Planet Eden WASM] ✅ UI initialized');
-        this.loadingScreen.setProgress(70, 'Interface ready');
+        try {
+            this.ui = new WasmUI(this.wasmModule, this.renderer);
+            this.ui.init();
+            console.log('[Planet Eden WASM] ✅ UI initialized');
+            this.loadingScreen.setProgress(70, 'Interface ready');
+        } catch (error) {
+            console.error('[Planet Eden WASM] ❌ Failed to initialize UI:', error);
+            this.loadingScreen.setProgress(65, 'UI initialization failed');
+            this.showError(`Failed to initialize user interface: ${error.message}`);
+            return false;
+        }
 
         // Initialize feature systems
         console.log('[Planet Eden WASM] Initializing feature systems...');
         this.loadingScreen.setProgress(75, 'Loading audio system...');
 
+        // Track which systems initialized successfully for graceful degradation
+        const featureStatus = {
+            events: false,
+            audio: false,
+            particles: false,
+            goals: false,
+            screenshot: false,
+            sparkline: false,
+            help: false,
+            settings: false,
+            save: false,
+            uiAnimations: false,
+            hud: false
+        };
+
         // Event/Toast system
-        this.eventSystem.init();
+        try {
+            this.eventSystem.init();
+            featureStatus.events = true;
+        } catch (error) {
+            console.warn('[Planet Eden WASM] ⚠️ Event system failed to initialize:', error);
+        }
 
         // Audio system (user must click to enable due to browser policy)
-        this.audioSystem.init();
+        try {
+            this.audioSystem.init();
+            featureStatus.audio = true;
+        } catch (error) {
+            console.warn('[Planet Eden WASM] ⚠️ Audio system failed to initialize:', error);
+        }
 
         // Particle system (needs Three.js scene)
-        this.particleSystem = new ParticleSystem(this.renderer.scene);
-        this.particleSystem.init();
+        try {
+            this.particleSystem = new ParticleSystem(this.renderer.scene);
+            this.particleSystem.init();
+            featureStatus.particles = true;
 
-        // Connect particle system to renderer for birth/death effects
-        this.renderer.setParticleSystem(this.particleSystem);
+            // Connect particle system to renderer for birth/death effects
+            this.renderer.setParticleSystem(this.particleSystem);
+        } catch (error) {
+            console.warn('[Planet Eden WASM] ⚠️ Particle system failed to initialize:', error);
+        }
 
-        // Connect audio system to renderer for weather sounds
-        this.renderer.setAudioSystem(this.audioSystem);
+        // Connect audio system to renderer for weather sounds (only if audio initialized)
+        if (featureStatus.audio) {
+            try {
+                this.renderer.setAudioSystem(this.audioSystem);
+            } catch (error) {
+                console.warn('[Planet Eden WASM] ⚠️ Failed to connect audio to renderer:', error);
+            }
+        }
 
         this.loadingScreen.setProgress(80, 'Initializing effects...');
 
         // Goals/Milestones system (with particle celebration effects)
-        this.goalSystem.init(this.eventSystem, this.audioSystem, this.particleSystem);
+        try {
+            this.goalSystem.init(
+                featureStatus.events ? this.eventSystem : null,
+                featureStatus.audio ? this.audioSystem : null,
+                featureStatus.particles ? this.particleSystem : null
+            );
+            featureStatus.goals = true;
+        } catch (error) {
+            console.warn('[Planet Eden WASM] ⚠️ Goal system failed to initialize:', error);
+        }
 
         // Screenshot system
-        this.screenshotSystem = new ScreenshotSystem(this.renderer);
-        this.screenshotSystem.init();
+        try {
+            this.screenshotSystem = new ScreenshotSystem(this.renderer);
+            this.screenshotSystem.init();
+            featureStatus.screenshot = true;
+        } catch (error) {
+            console.warn('[Planet Eden WASM] ⚠️ Screenshot system failed to initialize:', error);
+        }
 
         // Population sparkline graph
-        this.sparkline.init();
+        try {
+            this.sparkline.init();
+            featureStatus.sparkline = true;
+        } catch (error) {
+            console.warn('[Planet Eden WASM] ⚠️ Sparkline graph failed to initialize:', error);
+        }
 
         // Help system (? key shortcut)
-        helpSystem.init();
+        try {
+            helpSystem.init();
+            featureStatus.help = true;
+        } catch (error) {
+            console.warn('[Planet Eden WASM] ⚠️ Help system failed to initialize:', error);
+        }
 
         // Settings system
-        this.settingsSystem.init();
-        this.settingsSystem.onSettingsChange = (settings) => this.applySettings(settings);
+        try {
+            this.settingsSystem.init();
+            this.settingsSystem.onSettingsChange = (settings) => this.applySettings(settings);
+            featureStatus.settings = true;
+        } catch (error) {
+            console.warn('[Planet Eden WASM] ⚠️ Settings system failed to initialize:', error);
+        }
 
         // Save system
-        this.saveSystem.init(this.wasmModule, this.renderer, this.eventSystem);
+        try {
+            this.saveSystem.init(this.wasmModule, this.renderer, this.eventSystem);
+            featureStatus.save = true;
+        } catch (error) {
+            console.warn('[Planet Eden WASM] ⚠️ Save system failed to initialize:', error);
+        }
 
         // UI Animations
-        this.uiAnimations.init();
-        this.uiAnimations.setAudioSystem(this.audioSystem);
+        try {
+            this.uiAnimations.init();
+            if (featureStatus.audio) {
+                this.uiAnimations.setAudioSystem(this.audioSystem);
+            }
+            featureStatus.uiAnimations = true;
+        } catch (error) {
+            console.warn('[Planet Eden WASM] ⚠️ UI animations failed to initialize:', error);
+        }
 
         // New unified HUD
-        this.hud.init(this.wasmModule, this.renderer, this.audioSystem);
+        try {
+            this.hud.init(
+                this.wasmModule,
+                this.renderer,
+                featureStatus.audio ? this.audioSystem : null
+            );
+            featureStatus.hud = true;
+        } catch (error) {
+            console.warn('[Planet Eden WASM] ⚠️ HUD failed to initialize:', error);
+        }
 
-        console.log('[Planet Eden WASM] ✅ Feature systems initialized');
+        // Log feature initialization summary
+        const successCount = Object.values(featureStatus).filter(Boolean).length;
+        const totalCount = Object.keys(featureStatus).length;
+        console.log(`[Planet Eden WASM] ✅ Feature systems initialized (${successCount}/${totalCount})`);
+
+        if (successCount < totalCount) {
+            const failedFeatures = Object.entries(featureStatus)
+                .filter(([, status]) => !status)
+                .map(([name]) => name)
+                .join(', ');
+            console.warn(`[Planet Eden WASM] ⚠️ Some features unavailable: ${failedFeatures}`);
+        }
 
         // Setup pause overlay
         this.pauseOverlay = document.getElementById('pause-overlay');
@@ -533,8 +644,6 @@ class PlanetEdenWasm {
 
     updateHUD() {
         const stats = this.wasmModule.getStats();
-        const tribes = this.wasmModule.getAllTribes();
-        const typeCounts = SparklineGraph.countTypes(this.wasmModule);
 
         // Update FPS
         this.hud.updateFPS(this.ui.fps);
@@ -556,7 +665,10 @@ class PlanetEdenWasm {
         }
 
         // Update stats and tribes (less frequently)
+        // Only compute expensive data when we actually need it
         if (Math.floor(stats.time * 10) % 5 === 0) {
+            const typeCounts = SparklineGraph.countTypes(this.wasmModule);
+            const tribes = this.wasmModule.getAllTribes();
             this.hud.updateStats(stats, typeCounts);
             this.hud.updateTribes(tribes);
         }

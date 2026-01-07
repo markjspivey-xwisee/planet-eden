@@ -8,6 +8,10 @@ export class HUD {
         this.wasmModule = null;
         this.renderer = null;
         this.audioSystem = null;
+
+        // Store listener references for cleanup
+        this._listeners = [];
+        this._destroyed = false;
     }
 
     init(wasmModule, renderer, audioSystem) {
@@ -20,6 +24,18 @@ export class HUD {
         this.setupEventListeners();
 
         console.log('[HUD] Initialized');
+    }
+
+    /**
+     * Helper method to add an event listener and store reference for cleanup
+     * @param {EventTarget} target - The target element or window
+     * @param {string} event - The event type
+     * @param {Function} handler - The event handler
+     * @param {Object} options - Optional event listener options
+     */
+    _addListener(target, event, handler, options) {
+        target.addEventListener(event, handler, options);
+        this._listeners.push({ target, event, handler, options });
     }
 
     injectStyles() {
@@ -141,6 +157,20 @@ export class HUD {
                 background: var(--hud-accent-dim);
                 border-color: var(--hud-accent);
                 color: var(--hud-accent);
+            }
+
+            /* ===== Focus Visible Styles for Keyboard Navigation ===== */
+            .hud-icon-btn:focus-visible,
+            .hud-tab-btn:focus-visible,
+            .hud-quickbar-btn:focus-visible,
+            .hud-power-btn:focus-visible {
+                outline: 2px solid var(--hud-accent);
+                outline-offset: 2px;
+            }
+
+            .hud-speed-slider:focus-visible {
+                outline: 2px solid var(--hud-accent);
+                outline-offset: 4px;
             }
 
             /* ===== Side Panel ===== */
@@ -611,16 +641,16 @@ export class HUD {
                 </div>
 
                 <div class="hud-topbar-right">
-                    <button class="hud-icon-btn" id="hud-audio-toggle" title="Toggle Audio">
+                    <button class="hud-icon-btn" id="hud-audio-toggle" title="Toggle Audio" aria-label="Toggle audio on or off">
                         🔊
                     </button>
-                    <button class="hud-icon-btn" id="hud-screenshot-btn" title="Screenshot">
+                    <button class="hud-icon-btn" id="hud-screenshot-btn" title="Screenshot" aria-label="Take screenshot">
                         📷
                     </button>
-                    <button class="hud-icon-btn" id="hud-settings-btn" title="Settings">
+                    <button class="hud-icon-btn" id="hud-settings-btn" title="Settings" aria-label="Open settings">
                         ⚙️
                     </button>
-                    <button class="hud-icon-btn" id="hud-sidebar-toggle" title="Toggle Panel">
+                    <button class="hud-icon-btn" id="hud-sidebar-toggle" title="Toggle Panel" aria-label="Toggle side panel" aria-expanded="false">
                         📊
                     </button>
                 </div>
@@ -628,24 +658,24 @@ export class HUD {
 
             <!-- Side Panel -->
             <div class="hud-sidebar" id="hud-sidebar">
-                <div class="hud-sidebar-tabs">
-                    <button class="hud-tab-btn active" data-tab="stats">Stats</button>
-                    <button class="hud-tab-btn" data-tab="tribes">Tribes</button>
-                    <button class="hud-tab-btn" data-tab="powers">Powers</button>
+                <div class="hud-sidebar-tabs" role="tablist" aria-label="Information panels">
+                    <button class="hud-tab-btn active" data-tab="stats" role="tab" aria-selected="true" aria-controls="hud-stats-content" id="tab-stats">Stats</button>
+                    <button class="hud-tab-btn" data-tab="tribes" role="tab" aria-selected="false" aria-controls="hud-tribes-content" id="tab-tribes">Tribes</button>
+                    <button class="hud-tab-btn" data-tab="powers" role="tab" aria-selected="false" aria-controls="hud-powers-content" id="tab-powers">Powers</button>
                 </div>
                 <div class="hud-sidebar-content">
                     <!-- Stats Tab -->
-                    <div class="hud-tab-content active" id="hud-stats-content">
+                    <div class="hud-tab-content active" id="hud-stats-content" role="tabpanel" aria-labelledby="tab-stats">
                         <div class="hud-stat-grid" id="hud-stat-grid"></div>
                     </div>
 
                     <!-- Tribes Tab -->
-                    <div class="hud-tab-content" id="hud-tribes-content">
+                    <div class="hud-tab-content" id="hud-tribes-content" role="tabpanel" aria-labelledby="tab-tribes">
                         <div id="hud-tribe-list"></div>
                     </div>
 
                     <!-- Powers Tab -->
-                    <div class="hud-tab-content" id="hud-powers-content">
+                    <div class="hud-tab-content" id="hud-powers-content" role="tabpanel" aria-labelledby="tab-powers">
                         <div class="hud-power-grid">
                             <button class="hud-power-btn" data-power="spawn-tribe">
                                 <span class="icon">👥</span>
@@ -683,22 +713,22 @@ export class HUD {
             </div>
 
             <!-- Quick Bar -->
-            <div class="hud-quickbar">
-                <button class="hud-quickbar-btn" id="hud-spawn-plant" title="Spawn Plant">🌱</button>
-                <button class="hud-quickbar-btn" id="hud-spawn-herbivore" title="Spawn Herbivore">🦌</button>
-                <button class="hud-quickbar-btn" id="hud-spawn-carnivore" title="Spawn Carnivore">🦁</button>
-                <button class="hud-quickbar-btn" id="hud-spawn-humanoid" title="Spawn Humanoid">👤</button>
+            <div class="hud-quickbar" role="toolbar" aria-label="Spawn controls and playback">
+                <button class="hud-quickbar-btn" id="hud-spawn-plant" title="Spawn Plant" aria-label="Spawn a plant">🌱</button>
+                <button class="hud-quickbar-btn" id="hud-spawn-herbivore" title="Spawn Herbivore" aria-label="Spawn a herbivore">🦌</button>
+                <button class="hud-quickbar-btn" id="hud-spawn-carnivore" title="Spawn Carnivore" aria-label="Spawn a carnivore">🦁</button>
+                <button class="hud-quickbar-btn" id="hud-spawn-humanoid" title="Spawn Humanoid" aria-label="Spawn a humanoid">👤</button>
 
-                <div class="hud-quickbar-divider"></div>
+                <div class="hud-quickbar-divider" role="separator"></div>
 
-                <button class="hud-quickbar-btn pause" id="hud-pause-btn" title="Pause (Space)">▶️</button>
+                <button class="hud-quickbar-btn pause" id="hud-pause-btn" title="Pause (Space)" aria-label="Toggle pause, keyboard shortcut Space">▶️</button>
 
-                <div class="hud-quickbar-divider"></div>
+                <div class="hud-quickbar-divider" role="separator"></div>
 
                 <div class="hud-speed-control">
                     <input type="range" class="hud-speed-slider" id="hud-speed-slider"
-                           min="0.1" max="5" step="0.1" value="1">
-                    <span class="hud-speed-value" id="hud-speed-value">1.0x</span>
+                           min="0.1" max="5" step="0.1" value="1" aria-label="Simulation speed">
+                    <span class="hud-speed-value" id="hud-speed-value" aria-live="polite">1.0x</span>
                 </div>
             </div>
 
@@ -713,88 +743,106 @@ export class HUD {
 
     setupEventListeners() {
         // Sidebar toggle
-        document.getElementById('hud-sidebar-toggle').addEventListener('click', () => {
+        const sidebarToggle = document.getElementById('hud-sidebar-toggle');
+        const sidebarToggleHandler = () => {
             this.toggleSidebar();
-        });
+        };
+        this._addListener(sidebarToggle, 'click', sidebarToggleHandler);
 
         // Tab switching
         document.querySelectorAll('.hud-tab-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
+            const tabHandler = (e) => {
                 this.switchTab(e.target.dataset.tab);
-            });
+            };
+            this._addListener(btn, 'click', tabHandler);
         });
 
         // Speed slider
         const speedSlider = document.getElementById('hud-speed-slider');
         const speedValue = document.getElementById('hud-speed-value');
-        speedSlider.addEventListener('input', (e) => {
+        const speedSliderHandler = (e) => {
             const value = parseFloat(e.target.value);
             speedValue.textContent = `${value.toFixed(1)}x`;
             if (window.planetEden) {
                 window.planetEden.timeScale = value;
             }
-        });
+        };
+        this._addListener(speedSlider, 'input', speedSliderHandler);
 
         // Pause button
-        document.getElementById('hud-pause-btn').addEventListener('click', () => {
+        const pauseBtn = document.getElementById('hud-pause-btn');
+        const pauseHandler = () => {
             if (window.planetEden) {
                 window.planetEden.togglePause();
                 this.updatePauseButton();
             }
-        });
+        };
+        this._addListener(pauseBtn, 'click', pauseHandler);
 
         // Spawn buttons
         ['plant', 'herbivore', 'carnivore', 'humanoid'].forEach((type, index) => {
-            document.getElementById(`hud-spawn-${type}`).addEventListener('click', () => {
+            const spawnBtn = document.getElementById(`hud-spawn-${type}`);
+            const spawnHandler = () => {
                 if (window.planetEden && window.planetEden.ui) {
                     window.planetEden.ui.spawnRandom(index);
                 }
-            });
+            };
+            this._addListener(spawnBtn, 'click', spawnHandler);
         });
 
         // Power buttons
         document.querySelectorAll('.hud-power-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
+            const powerHandler = () => {
                 const power = btn.dataset.power;
                 this.activatePower(power);
-            });
+            };
+            this._addListener(btn, 'click', powerHandler);
         });
 
         // Settings button
-        document.getElementById('hud-settings-btn').addEventListener('click', () => {
+        const settingsBtn = document.getElementById('hud-settings-btn');
+        const settingsHandler = () => {
             if (window.planetEden && window.planetEden.settingsSystem) {
                 window.planetEden.settingsSystem.show();
             }
-        });
+        };
+        this._addListener(settingsBtn, 'click', settingsHandler);
 
         // Audio toggle
-        document.getElementById('hud-audio-toggle').addEventListener('click', () => {
+        const audioToggleBtn = document.getElementById('hud-audio-toggle');
+        const audioToggleHandler = () => {
             if (this.audioSystem) {
                 this.audioSystem.toggle();
                 this.updateAudioButton();
             }
-        });
+        };
+        this._addListener(audioToggleBtn, 'click', audioToggleHandler);
 
         // Screenshot button
-        document.getElementById('hud-screenshot-btn').addEventListener('click', () => {
+        const screenshotBtn = document.getElementById('hud-screenshot-btn');
+        const screenshotHandler = () => {
             if (window.planetEden && window.planetEden.screenshotSystem) {
                 window.planetEden.screenshotSystem.capture();
             }
-        });
+        };
+        this._addListener(screenshotBtn, 'click', screenshotHandler);
 
-        // Keyboard shortcut for sidebar
-        window.addEventListener('keydown', (e) => {
+        // Keyboard shortcut for sidebar (window-level listener)
+        const keydownHandler = (e) => {
             if (e.key === 'Tab' && !e.ctrlKey && !e.altKey) {
                 e.preventDefault();
                 this.toggleSidebar();
             }
-        });
+        };
+        this._addListener(window, 'keydown', keydownHandler);
     }
 
     toggleSidebar() {
         this.sidebarVisible = !this.sidebarVisible;
         document.getElementById('hud-sidebar').classList.toggle('visible', this.sidebarVisible);
-        document.getElementById('hud-sidebar-toggle').classList.toggle('active', this.sidebarVisible);
+        const toggleBtn = document.getElementById('hud-sidebar-toggle');
+        toggleBtn.classList.toggle('active', this.sidebarVisible);
+        toggleBtn.setAttribute('aria-expanded', this.sidebarVisible ? 'true' : 'false');
 
         if (this.audioSystem) {
             if (this.sidebarVisible) {
@@ -808,9 +856,11 @@ export class HUD {
     switchTab(tabName) {
         this.activeTab = tabName;
 
-        // Update tab buttons
+        // Update tab buttons and aria-selected state
         document.querySelectorAll('.hud-tab-btn').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.tab === tabName);
+            const isActive = btn.dataset.tab === tabName;
+            btn.classList.toggle('active', isActive);
+            btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
         });
 
         // Update tab content
@@ -984,6 +1034,51 @@ export class HUD {
         const prefixes = ['Sun', 'Moon', 'Star', 'Storm', 'River', 'Mountain', 'Forest', 'Thunder'];
         const suffixes = ['Walkers', 'Seekers', 'Keepers', 'Hunters', 'Builders', 'Warriors', 'Singers', 'Dancers'];
         return `${prefixes[tribeId % prefixes.length]} ${suffixes[Math.floor(tribeId / prefixes.length) % suffixes.length]}`;
+    }
+
+    /**
+     * Cleanup method to properly remove all event listeners and DOM elements.
+     * Call this when the HUD needs to be destroyed (e.g., when switching scenes
+     * or cleaning up resources).
+     */
+    destroy() {
+        if (this._destroyed) {
+            console.warn('[HUD] Already destroyed');
+            return;
+        }
+
+        // Remove all registered event listeners
+        for (const { target, event, handler, options } of this._listeners) {
+            try {
+                target.removeEventListener(event, handler, options);
+            } catch (e) {
+                console.warn('[HUD] Failed to remove listener:', e);
+            }
+        }
+        this._listeners = [];
+
+        // Remove the HUD container from DOM
+        const container = document.getElementById('hud-container');
+        if (container) {
+            container.remove();
+        }
+
+        // Remove injected styles
+        const styles = document.getElementById('hud-styles');
+        if (styles) {
+            styles.remove();
+        }
+
+        // Clear cached element references
+        this.elements = null;
+
+        // Clear module references
+        this.wasmModule = null;
+        this.renderer = null;
+        this.audioSystem = null;
+
+        this._destroyed = true;
+        console.log('[HUD] Destroyed and cleaned up');
     }
 }
 

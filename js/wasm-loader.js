@@ -5,6 +5,12 @@ export class WasmModule {
         this.instance = null;
         this.memory = null;
         this.exports = null;
+
+        // Tribe data caching
+        this._tribesCache = null;
+        this._tribesCacheTime = 0;
+        this._tribesCacheInterval = 500; // Refresh cache every 500ms
+        this._tribesDirty = true; // Force initial fetch
     }
 
     async load(wasmPath = './zig-out/bin/planet-eden.wasm') {
@@ -190,17 +196,35 @@ export class WasmModule {
         };
     }
 
-    // Get all tribes
-    getAllTribes() {
+    // Mark tribes cache as dirty (call after spawn/death events)
+    invalidateTribesCache() {
+        this._tribesDirty = true;
+    }
+
+    // Get all tribes (with caching to avoid O(n) iteration every frame)
+    getAllTribes(forceRefresh = false) {
         if (!this.exports) {
-            console.log('[WASM Loader] getAllTribes: No exports');
             return [];
         }
 
-        const tribeCount = this.exports.getTribeCount();
-        console.log('[WASM Loader] getTribeCount() returned:', tribeCount);
+        const now = performance.now();
+        const cacheValid = this._tribesCache !== null &&
+                          !this._tribesDirty &&
+                          !forceRefresh &&
+                          (now - this._tribesCacheTime) < this._tribesCacheInterval;
 
-        if (tribeCount === 0) return [];
+        if (cacheValid) {
+            return this._tribesCache;
+        }
+
+        // Perform the expensive tribe lookup
+        const tribeCount = this.exports.getTribeCount();
+        if (tribeCount === 0) {
+            this._tribesCache = [];
+            this._tribesCacheTime = now;
+            this._tribesDirty = false;
+            return [];
+        }
 
         // Get unique tribe IDs from organisms
         const data = this.getOrganismData();
@@ -210,22 +234,22 @@ export class WasmModule {
             // Check for valid tribe ID (0xFFFFFFFF means no tribe)
             if (data.alive[i] && data.tribeIds[i] < 0xFFFFFFFF) {
                 uniqueTribeIds.add(data.tribeIds[i]);
-                console.log(`[WASM Loader] Found organism ${i} with tribe ${data.tribeIds[i]}, type ${data.types[i]}`);
             }
         }
-
-        console.log('[WASM Loader] Unique tribe IDs:', Array.from(uniqueTribeIds));
 
         const tribes = [];
         for (const tribeId of uniqueTribeIds) {
             const tribeData = this.getTribeData(tribeId);
-            console.log(`[WASM Loader] getTribeData(${tribeId}) returned:`, tribeData);
             if (tribeData && tribeData.memberCount > 0) {
                 tribes.push(tribeData);
             }
         }
 
-        console.log('[WASM Loader] getAllTribes returning', tribes.length, 'tribes');
+        // Update cache
+        this._tribesCache = tribes;
+        this._tribesCacheTime = now;
+        this._tribesDirty = false;
+
         return tribes;
     }
 
