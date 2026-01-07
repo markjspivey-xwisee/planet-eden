@@ -124,6 +124,18 @@ export class GoalSystem {
     }
 
     createUI() {
+        // Skip UI creation if new HUD is active
+        if (window.PLANET_EDEN_USE_NEW_HUD) {
+            console.log('[GoalSystem] Skipping old UI - using new HUD');
+            // Still setup keyboard shortcut
+            window.addEventListener('keydown', (e) => {
+                if (e.key === 'o' || e.key === 'O') {
+                    this.toggle();
+                }
+            });
+            return;
+        }
+
         // Goals panel (top left, below stats) - hidden by default, press O to toggle
         this.container = document.createElement('div');
         this.container.id = 'goals-panel';

@@ -42,6 +42,12 @@ export class EventSystem {
     }
 
     createUI() {
+        // Skip UI creation if new HUD is active (toasts still work via console)
+        if (window.PLANET_EDEN_USE_NEW_HUD) {
+            console.log('[EventSystem] Skipping old UI - using new HUD');
+            return;
+        }
+
         // Toast container (top right)
         this.container = document.createElement('div');
         this.container.id = 'toast-container';

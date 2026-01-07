@@ -258,62 +258,43 @@ export class WasmUI {
         const slider = document.getElementById('time-scale-slider');
         const valueDisplay = document.getElementById('time-scale-value');
 
-        slider.addEventListener('input', (e) => {
-            const value = parseFloat(e.target.value);
-            valueDisplay.textContent = `${value.toFixed(1)}x`;
-            if (window.planetEden) {
-                window.planetEden.timeScale = value;
-            }
-        });
+        if (slider && valueDisplay) {
+            slider.addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                valueDisplay.textContent = `${value.toFixed(1)}x`;
+                if (window.planetEden) {
+                    window.planetEden.timeScale = value;
+                }
+            });
+        }
 
-        // Spawn organism buttons
-        document.getElementById('btn-spawn-plant').addEventListener('click', () => {
-            this.spawnRandom(OrganismType.PLANT);
-        });
+        // Spawn organism buttons (safe null checks)
+        const btnPlant = document.getElementById('btn-spawn-plant');
+        const btnHerb = document.getElementById('btn-spawn-herbivore');
+        const btnCarn = document.getElementById('btn-spawn-carnivore');
+        const btnHuman = document.getElementById('btn-spawn-humanoid');
 
-        document.getElementById('btn-spawn-herbivore').addEventListener('click', () => {
-            this.spawnRandom(OrganismType.HERBIVORE);
-        });
-
-        document.getElementById('btn-spawn-carnivore').addEventListener('click', () => {
-            this.spawnRandom(OrganismType.CARNIVORE);
-        });
-
-        document.getElementById('btn-spawn-humanoid').addEventListener('click', () => {
-            this.spawnRandom(OrganismType.HUMANOID);
-        });
+        if (btnPlant) btnPlant.addEventListener('click', () => this.spawnRandom(OrganismType.PLANT));
+        if (btnHerb) btnHerb.addEventListener('click', () => this.spawnRandom(OrganismType.HERBIVORE));
+        if (btnCarn) btnCarn.addEventListener('click', () => this.spawnRandom(OrganismType.CARNIVORE));
+        if (btnHuman) btnHuman.addEventListener('click', () => this.spawnRandom(OrganismType.HUMANOID));
     }
 
     setupGodPowers() {
-        // F1 - Spawn New Tribe
-        document.getElementById('btn-spawn-tribe').addEventListener('click', () => {
-            this.godPowerSpawnTribe();
-        });
+        // God power buttons (safe null checks)
+        const btnTribe = document.getElementById('btn-spawn-tribe');
+        const btnMass = document.getElementById('btn-mass-spawn');
+        const btnGift = document.getElementById('btn-gift-resources');
+        const btnWar = document.getElementById('btn-trigger-war');
+        const btnPlague = document.getElementById('btn-plague');
+        const btnBless = document.getElementById('btn-blessing');
 
-        // F2 - Mass Spawn
-        document.getElementById('btn-mass-spawn').addEventListener('click', () => {
-            this.godPowerMassSpawn();
-        });
-
-        // F3 - Gift Resources
-        document.getElementById('btn-gift-resources').addEventListener('click', () => {
-            this.godPowerGiftResources();
-        });
-
-        // F4 - Lightning Strike
-        document.getElementById('btn-trigger-war').addEventListener('click', () => {
-            this.godPowerLightning();
-        });
-
-        // F5 - Plague
-        document.getElementById('btn-plague').addEventListener('click', () => {
-            this.godPowerPlague();
-        });
-
-        // F6 - Divine Blessing
-        document.getElementById('btn-blessing').addEventListener('click', () => {
-            this.godPowerBlessing();
-        });
+        if (btnTribe) btnTribe.addEventListener('click', () => this.godPowerSpawnTribe());
+        if (btnMass) btnMass.addEventListener('click', () => this.godPowerMassSpawn());
+        if (btnGift) btnGift.addEventListener('click', () => this.godPowerGiftResources());
+        if (btnWar) btnWar.addEventListener('click', () => this.godPowerLightning());
+        if (btnPlague) btnPlague.addEventListener('click', () => this.godPowerPlague());
+        if (btnBless) btnBless.addEventListener('click', () => this.godPowerBlessing());
 
         // Keyboard shortcuts
         window.addEventListener('keydown', (e) => {

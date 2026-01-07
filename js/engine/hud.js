@@ -859,6 +859,8 @@ export class HUD {
         const fpsChip = document.getElementById('hud-fps-chip');
         const fpsValue = document.getElementById('hud-fps');
 
+        if (!fpsChip || !fpsValue) return;
+
         fpsValue.textContent = fps;
 
         fpsChip.classList.remove('warning', 'danger');
@@ -870,12 +872,15 @@ export class HUD {
     }
 
     updatePopulation(count) {
-        document.getElementById('hud-population').textContent = count;
+        const el = document.getElementById('hud-population');
+        if (el) el.textContent = count;
     }
 
     updateTime(day, time) {
-        document.getElementById('hud-day').textContent = `Day ${day}`;
-        document.getElementById('hud-time').textContent = time;
+        const dayEl = document.getElementById('hud-day');
+        const timeEl = document.getElementById('hud-time');
+        if (dayEl) dayEl.textContent = `Day ${day}`;
+        if (timeEl) timeEl.textContent = time;
     }
 
     updateWeather(weather) {
@@ -885,7 +890,15 @@ export class HUD {
             rain: '🌧️',
             storm: '⛈️'
         };
-        document.getElementById('hud-weather').textContent = icons[weather] || '☀️';
+        const el = document.getElementById('hud-weather');
+        if (el) el.textContent = icons[weather] || '☀️';
+    }
+
+    updateSpeed(speed) {
+        const slider = document.getElementById('hud-speed-slider');
+        const value = document.getElementById('hud-speed-value');
+        if (slider) slider.value = speed;
+        if (value) value.textContent = `${speed.toFixed(1)}x`;
     }
 
     updateStats(stats, typeCounts) {

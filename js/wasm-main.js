@@ -271,16 +271,14 @@ class PlanetEdenWasm {
                 case '=':
                     this.timeScale = Math.min(5.0, this.timeScale + 0.5);
                     console.log(`[Planet Eden WASM] ⏩ Time scale: ${this.timeScale}x`);
-                    document.getElementById('time-scale-slider').value = this.timeScale;
-                    document.getElementById('time-scale-value').textContent = `${this.timeScale.toFixed(1)}x`;
+                    this.hud.updateSpeed(this.timeScale);
                     break;
 
                 case '-':
                 case '_':
                     this.timeScale = Math.max(0.1, this.timeScale - 0.5);
                     console.log(`[Planet Eden WASM] ⏪ Time scale: ${this.timeScale}x`);
-                    document.getElementById('time-scale-slider').value = this.timeScale;
-                    document.getElementById('time-scale-value').textContent = `${this.timeScale.toFixed(1)}x`;
+                    this.hud.updateSpeed(this.timeScale);
                     break;
 
                 case 'r':
