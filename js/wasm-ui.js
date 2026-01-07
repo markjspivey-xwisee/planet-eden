@@ -651,6 +651,9 @@ export class WasmUI {
     }
 
     updatePopulationChart() {
+        // Skip if chart doesn't exist (new HUD mode)
+        if (!this.populationChart) return;
+
         const stats = this.wasmModule.getStats();
         const tribes = this.wasmModule.getAllTribes();
         const time = stats.time.toFixed(0);
