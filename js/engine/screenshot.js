@@ -16,39 +16,37 @@ export class ScreenshotSystem {
     }
 
     createUI() {
-        // Skip UI creation if new HUD is active
-        if (window.PLANET_EDEN_USE_NEW_HUD) {
-            console.log('[ScreenshotSystem] Skipping old UI - using new HUD');
-            return;
+        // Skip button creation if new HUD is active (HUD has its own screenshot button)
+        // But always create the preview modal
+        if (!window.PLANET_EDEN_USE_NEW_HUD) {
+            // Screenshot button (only for old UI)
+            const btn = document.createElement('button');
+            btn.id = 'screenshot-btn';
+            btn.innerHTML = '📷';
+            btn.title = 'Take Screenshot (P)';
+            btn.style.cssText = `
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                width: 36px;
+                height: 36px;
+                background: rgba(0, 0, 0, 0.6);
+                border: 1px solid rgba(100, 200, 100, 0.2);
+                border-radius: 50%;
+                color: #fff;
+                font-size: 16px;
+                cursor: pointer;
+                z-index: 1001;
+                transition: all 0.2s;
+                opacity: 0.7;
+            `;
+            btn.onmouseover = () => { btn.style.background = 'rgba(50, 100, 50, 0.8)'; btn.style.opacity = '1'; };
+            btn.onmouseout = () => { btn.style.background = 'rgba(0, 0, 0, 0.6)'; btn.style.opacity = '0.7'; };
+            btn.onclick = () => this.capture();
+            document.body.appendChild(btn);
         }
 
-        // Screenshot button
-        const btn = document.createElement('button');
-        btn.id = 'screenshot-btn';
-        btn.innerHTML = '📷';
-        btn.title = 'Take Screenshot (P)';
-        btn.style.cssText = `
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            width: 36px;
-            height: 36px;
-            background: rgba(0, 0, 0, 0.6);
-            border: 1px solid rgba(100, 200, 100, 0.2);
-            border-radius: 50%;
-            color: #fff;
-            font-size: 16px;
-            cursor: pointer;
-            z-index: 1001;
-            transition: all 0.2s;
-            opacity: 0.7;
-        `;
-        btn.onmouseover = () => { btn.style.background = 'rgba(50, 100, 50, 0.8)'; btn.style.opacity = '1'; };
-        btn.onmouseout = () => { btn.style.background = 'rgba(0, 0, 0, 0.6)'; btn.style.opacity = '0.7'; };
-        btn.onclick = () => this.capture();
-        document.body.appendChild(btn);
-
-        // Preview modal (hidden)
+        // Preview modal (hidden) - always create this
         this.previewModal = document.createElement('div');
         this.previewModal.id = 'screenshot-modal';
         this.previewModal.style.cssText = `
