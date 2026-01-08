@@ -1392,7 +1392,7 @@ export class AAAUISystem {
 
         // Get organism data
         const data = this.wasmModule.getOrganismData();
-        if (!data) return;
+        if (!data || !data.x || !data.z || !data.types || !data.alive) return;
 
         // Map world coordinates to minimap
         // Assuming world is roughly -50 to 50 in x and z
