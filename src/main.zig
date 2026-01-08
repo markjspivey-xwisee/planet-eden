@@ -28,8 +28,8 @@ const organism = @import("organism.zig");
 var global_sim: simulation.Simulation = undefined;
 var sim_initialized: bool = false;
 
-// Static memory buffer for allocations (512KB, uninitialized to avoid large data section)
-var memory_buffer: [512 * 1024]u8 = undefined;
+// Static memory buffer for allocations (2MB, uninitialized to avoid large data section)
+var memory_buffer: [2 * 1024 * 1024]u8 = undefined;
 var fba: std.heap.FixedBufferAllocator = undefined;
 
 fn getAllocator() std.mem.Allocator {
