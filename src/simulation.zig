@@ -1,5 +1,6 @@
 // Main simulation loop - coordinates all systems
 // This is the heart of the Planet Eden simulation
+// Version: 2.0 - AAA Strategic Systems (Diplomacy, Tech, Seasons, Territory, Population)
 
 const std = @import("std");
 const math = @import("math.zig");
@@ -11,8 +12,16 @@ const equipment = @import("equipment.zig");
 const message = @import("message.zig");
 const nn = @import("neural_network.zig");
 
+// New AAA systems
+const diplomacy = @import("diplomacy.zig");
+const technology = @import("technology.zig");
+const seasons = @import("seasons.zig");
+const territory = @import("territory.zig");
+const population = @import("population.zig");
+
 /// Main simulation state
 pub const Simulation = struct {
+    // Core systems
     organisms: organism.Organisms,
     grid: spatial_grid.SpatialGrid,
     tribes: tribe.Tribes,
@@ -20,6 +29,13 @@ pub const Simulation = struct {
     equipment_mgr: equipment.EquipmentManager,
     messages: message.MessageQueue,
     language_stats: message.LanguageStats,
+
+    // AAA Strategic Systems
+    diplomacy_mgr: diplomacy.DiplomacyManager,
+    tech_mgr: technology.TechnologyManager,
+    season_mgr: seasons.SeasonManager,
+    territory_mgr: territory.TerritoryManager,
+    population_mgr: population.PopulationManager,
 
     rng: math.Rng,
     time: f32,
@@ -40,6 +56,7 @@ pub const Simulation = struct {
         sim.time = 0;
         sim.frame_count = 0;
 
+        // Core systems
         sim.organisms = try organism.Organisms.init(allocator, org_cap);
         sim.grid = spatial_grid.SpatialGrid.init(allocator);
         sim.tribes = tribe.Tribes.init();
@@ -47,6 +64,13 @@ pub const Simulation = struct {
         sim.equipment_mgr = try equipment.EquipmentManager.init(allocator, 30);
         sim.messages = try message.MessageQueue.init(allocator, 50);
         sim.language_stats = message.LanguageStats.init();
+
+        // AAA Strategic Systems
+        sim.diplomacy_mgr = diplomacy.DiplomacyManager.init();
+        sim.tech_mgr = technology.TechnologyManager.init();
+        sim.season_mgr = seasons.SeasonManager.init();
+        sim.territory_mgr = territory.TerritoryManager.init(&sim.rng);
+        sim.population_mgr = population.PopulationManager.init();
 
         return sim;
     }
@@ -64,7 +88,7 @@ pub const Simulation = struct {
         self.time += delta;
         self.frame_count += 1;
 
-        // Update subsystems
+        // Update subsystems (core)
         self.updateSpatialGrid();
         self.updateOrganisms(delta);
         self.updateTribes(delta);
@@ -73,12 +97,22 @@ pub const Simulation = struct {
         self.updateMessages(delta);
         self.updateInteractions(delta);
 
-        // NOTE: Compaction disabled - it shifts organism indices which breaks the
-        // renderer's ID-based mesh tracking, causing visual jumping/jerking.
-        // With 500 capacity, we have plenty of room. Dead organisms are just skipped.
-        // if (self.frame_count % 600 == 0) {
-        //     self.organisms.compact();
-        // }
+        // Update AAA Strategic Systems
+        self.updateSeasons(delta);
+        self.updateDiplomacy(delta);
+        self.updateTechnology(delta);
+        self.updateTerritory(delta);
+        self.updatePopulation(delta);
+
+        // AI decision making (less frequent to save CPU)
+        if (self.frame_count % 60 == 0) {
+            self.updateTribeAI();
+        }
+
+        // Yearly statistics reset
+        if (self.frame_count % 3600 == 0) { // ~60 seconds at 60fps
+            self.population_mgr.resetYearlyStats();
+        }
     }
 
     /// Rebuild spatial grid with current organism positions
@@ -128,6 +162,10 @@ pub const Simulation = struct {
         const tribe_id = self.organisms.tribe_ids[idx];
         const has_tribe = tribe_id < self.tribes.count;
 
+        // Get seasonal and environmental modifiers
+        const movement_mod = self.season_mgr.movement_modifier;
+        const is_harsh = self.season_mgr.isHarshConditions(pos.x, pos.z);
+
         // Normalize inputs
         inputs[0] = energy / 100.0;
         inputs[1] = health / 100.0;
@@ -139,16 +177,18 @@ pub const Simulation = struct {
         var nearby: [32]u32 = undefined;
         const nearby_count = self.grid.queryNeighbors(pos, &nearby);
 
-        // Count food sources, threats, etc.
+        // Count food sources, threats, enemies (enhanced with diplomacy)
         var food_count: f32 = 0;
         var threat_count: f32 = 0;
         var ally_count: f32 = 0;
+        var enemy_count: f32 = 0;
 
         for (nearby[0..nearby_count]) |other_idx| {
             if (other_idx == idx) continue;
             if (!self.organisms.alive[other_idx]) continue;
 
             const other_type = @as(organism.OrganismType, @enumFromInt(self.organisms.types[other_idx]));
+            const other_tribe = self.organisms.tribe_ids[other_idx];
 
             if (my_type == .herbivore and other_type == .plant) {
                 food_count += 1;
@@ -159,16 +199,24 @@ pub const Simulation = struct {
             } else if (self.organisms.tribe_ids[other_idx] == tribe_id and has_tribe) {
                 ally_count += 1;
             }
+
+            // Check diplomatic status for enemies
+            if (has_tribe and other_tribe < self.tribes.count and other_tribe != tribe_id) {
+                if (self.diplomacy_mgr.isAtWar(tribe_id, other_tribe)) {
+                    enemy_count += 1;
+                    threat_count += 0.5; // War enemies are threats
+                }
+            }
         }
 
         inputs[5] = math.clamp(food_count / 5.0, 0, 1);
-        inputs[6] = math.clamp(threat_count / 5.0, 0, 1);
+        inputs[6] = math.clamp((threat_count + enemy_count) / 5.0, 0, 1);
         inputs[7] = math.clamp(ally_count / 10.0, 0, 1);
         inputs[8] = self.organisms.ages[idx] / 1000.0;
         inputs[9] = self.organisms.sizes[idx] / 2.0;
         inputs[10] = if (self.organisms.is_attacking[idx]) 1.0 else 0.0;
         inputs[11] = if (self.organisms.is_eating[idx]) 1.0 else 0.0;
-        inputs[12] = self.rng.float(); // Random input for variation
+        inputs[12] = if (is_harsh) 0.0 else self.rng.float(); // Harsh conditions affect behavior
         inputs[13] = @sin(self.time); // Temporal input
         inputs[14] = @cos(self.time); // Temporal input
 
@@ -176,26 +224,18 @@ pub const Simulation = struct {
         brain.predict(&inputs, &outputs, &hidden);
 
         // =====================================================
-        // Apply outputs (17 total)
+        // Apply outputs (17 total) - Enhanced with new systems
         // =====================================================
-        // outputs[0-2] = movement direction
-        // outputs[3] = speed multiplier
-        // outputs[4] = eat action
-        // outputs[5] = attack action
-        // outputs[6-8] = build (trigger, type, distance)
-        // outputs[9-11] = message (trigger, symbol1, symbol2)
-        // outputs[12] = reproduce
-        // outputs[13] = flee intensity
-        // outputs[14] = gather resources
-        // outputs[15] = share with tribe
-        // outputs[16] = recruit/call allies
 
         // === MOVEMENT (outputs 0-3) ===
         const move_dir = math.Vec3.init(outputs[0], 0, outputs[2]).normalize();
         var speed = math.clamp(outputs[3], 0, 1) * 5.0;
 
+        // Apply seasonal movement modifier
+        speed *= movement_mod;
+
         // Flee behavior (output 13) - boost speed away from threats
-        if (outputs[13] > 0.3 and threat_count > 0) {
+        if (outputs[13] > 0.3 and (threat_count > 0 or enemy_count > 0)) {
             speed *= 1.0 + outputs[13]; // Up to 2x speed when fleeing
         }
 
@@ -243,10 +283,14 @@ pub const Simulation = struct {
             self.messages.sendPair(@intCast(idx), 0, symbol1, symbol2) catch {};
         }
 
-        // === REPRODUCTION (output 12) ===
+        // === REPRODUCTION (output 12) - Enhanced with population system ===
         if (outputs[12] > 0.7 and self.organisms.reproduction_cooldowns[idx] <= 0) {
-            // Need enough energy to reproduce
-            if (energy > 60.0 and self.organisms.count < self.organisms.capacity) {
+            // Check seasonal birth modifier
+            const birth_mod = self.season_mgr.birth_rate_modifier;
+
+            // Need enough energy to reproduce (harder in winter)
+            const energy_threshold = 60.0 / birth_mod;
+            if (energy > energy_threshold and self.organisms.count < self.organisms.capacity) {
                 // Find nearby ally of same type for reproduction
                 for (nearby[0..nearby_count]) |other_idx| {
                     if (other_idx == idx) continue;
@@ -266,7 +310,10 @@ pub const Simulation = struct {
                         pos.z + self.rng.range(-2, 2),
                     );
 
-                    _ = self.spawnOrganism(my_type, offspring_pos, tribe_id) catch {};
+                    const child_id = self.spawnOrganism(my_type, offspring_pos, tribe_id) catch break;
+
+                    // Initialize health state for new organism
+                    self.population_mgr.initOrganism(child_id, &self.rng);
 
                     // Cost energy and set cooldown
                     self.organisms.energies[idx] -= 30.0;
@@ -276,14 +323,21 @@ pub const Simulation = struct {
             }
         }
 
-        // === GATHER RESOURCES (output 14) ===
-        // Humanoids can gather resources for their tribe
+        // === GATHER RESOURCES (output 14) - Enhanced with territory/tech ===
         if (outputs[14] > 0.5 and has_tribe and my_type == .humanoid) {
             if (self.tribes.getTribe(tribe_id)) |t| {
-                // Passive resource gathering based on output strength
-                const gather_rate = (outputs[14] + 1.0) * 0.05;
-                t.food += gather_rate;
-                t.wood += gather_rate * 0.5;
+                // Get tech bonuses
+                const bonuses = self.tech_mgr.getBonuses(tribe_id);
+
+                // Base gathering rates with seasonal modifiers
+                const gather_rate = (outputs[14] + 1.0) * 0.05 * self.season_mgr.food_modifier;
+
+                // Apply technology bonuses
+                t.food += gather_rate * bonuses.food_mult;
+                t.wood += gather_rate * 0.5 * bonuses.wood_mult;
+
+                // Claim territory where gathering
+                _ = self.territory_mgr.claimTerritory(pos.x, pos.z, tribe_id);
             }
         }
 
@@ -296,8 +350,7 @@ pub const Simulation = struct {
             }
         }
 
-        // === RECRUIT (output 16) ===
-        // Try to recruit nearby tribeless humanoids
+        // === RECRUIT (output 16) - Enhanced with diplomacy ===
         if (outputs[16] > 0.6 and has_tribe and my_type == .humanoid) {
             for (nearby[0..nearby_count]) |other_idx| {
                 if (other_idx == idx) continue;
@@ -306,8 +359,15 @@ pub const Simulation = struct {
                 const other_type = @as(organism.OrganismType, @enumFromInt(self.organisms.types[other_idx]));
                 if (other_type != .humanoid) continue;
 
+                const other_tribe = self.organisms.tribe_ids[other_idx];
+
+                // Record first contact between tribes
+                if (other_tribe < self.tribes.count and other_tribe != tribe_id) {
+                    self.diplomacy_mgr.recordFirstContact(tribe_id, other_tribe);
+                }
+
                 // Only recruit tribeless (tribe_id >= tribes.count means no tribe)
-                if (self.organisms.tribe_ids[other_idx] < self.tribes.count) continue;
+                if (other_tribe < self.tribes.count) continue;
 
                 // Recruit to our tribe
                 self.organisms.tribe_ids[other_idx] = tribe_id;
@@ -344,7 +404,142 @@ pub const Simulation = struct {
         self.messages.update(delta);
     }
 
-    /// Update interactions (eating, combat, reproduction)
+    // === AAA STRATEGIC SYSTEMS UPDATE ===
+
+    /// Update seasons and weather
+    fn updateSeasons(self: *Simulation, delta: f32) void {
+        self.season_mgr.update(delta, &self.rng);
+    }
+
+    /// Update diplomacy system
+    fn updateDiplomacy(self: *Simulation, delta: f32) void {
+        self.diplomacy_mgr.update(delta, self.time);
+    }
+
+    /// Update technology research
+    fn updateTechnology(self: *Simulation, delta: f32) void {
+        self.tech_mgr.update(delta, &self.tribes);
+    }
+
+    /// Update territory control
+    fn updateTerritory(self: *Simulation, delta: f32) void {
+        self.territory_mgr.update(delta);
+
+        // Apply territory yields to tribes (every 60 frames)
+        if (self.frame_count % 60 == 0) {
+            for (0..self.tribes.count) |i| {
+                if (self.tribes.getTribe(@intCast(i))) |t| {
+                    const yields = self.territory_mgr.getTotalYield(@intCast(i));
+                    const bonuses = self.tech_mgr.getBonuses(@intCast(i));
+
+                    // Add yields with tech multipliers
+                    t.food += yields.food * bonuses.food_mult * 0.1;
+                    t.wood += yields.wood * bonuses.wood_mult * 0.1;
+                    t.stone += yields.stone * bonuses.stone_mult * 0.1;
+                    t.metal += yields.metal * bonuses.metal_mult * 0.1;
+                }
+            }
+        }
+    }
+
+    /// Update population dynamics
+    fn updatePopulation(self: *Simulation, delta: f32) void {
+        self.population_mgr.update(
+            delta,
+            &self.organisms,
+            &self.tribes,
+            &self.rng,
+            self.season_mgr.birth_rate_modifier,
+            if (self.season_mgr.current_weather == .rain) 1.2 else 1.0,
+        );
+
+        // Record deaths
+        for (0..self.organisms.count) |i| {
+            if (self.organisms.alive[i]) continue;
+            if (self.organisms.healths[i] <= 0) {
+                self.population_mgr.recordDeath(i, self.organisms.tribe_ids[i]);
+            }
+        }
+    }
+
+    /// Update tribe AI decision making
+    fn updateTribeAI(self: *Simulation) void {
+        for (0..self.tribes.count) |i| {
+            const tribe_id: u32 = @intCast(i);
+            if (self.tribes.getTribe(tribe_id) == null) continue;
+
+            // Auto-select research if not researching
+            self.tech_mgr.autoSelectResearch(tribe_id, &self.rng);
+
+            // Diplomatic AI decisions
+            self.updateTribeDiplomacyAI(tribe_id);
+        }
+    }
+
+    /// Tribe diplomatic AI
+    fn updateTribeDiplomacyAI(self: *Simulation, tribe_id: u32) void {
+        const t = self.tribes.getTribe(tribe_id) orelse return;
+
+        // Check relationships with other tribes
+        for (0..self.tribes.count) |j| {
+            const other_id: u32 = @intCast(j);
+            if (other_id == tribe_id) continue;
+            if (self.tribes.getTribe(other_id) == null) continue;
+
+            // Only act if we've met
+            if (!self.diplomacy_mgr.haveMet(tribe_id, other_id)) continue;
+
+            const rep = self.diplomacy_mgr.getReputation(tribe_id, other_id);
+            const at_war = self.diplomacy_mgr.isAtWar(tribe_id, other_id);
+
+            // Consider declaring war if hostile and we share a border
+            if (!at_war and rep < -40 and self.territory_mgr.sharesBorder(tribe_id, other_id)) {
+                if (self.rng.float() < 0.01) { // 1% chance per AI tick
+                    // Only declare if we have more members
+                    const other_t = self.tribes.getTribe(other_id) orelse continue;
+                    if (t.member_count > other_t.member_count) {
+                        _ = self.diplomacy_mgr.declareWar(tribe_id, other_id, .conquest, self.time);
+                    }
+                }
+            }
+
+            // Consider peace if war is going badly
+            if (at_war) {
+                if (self.diplomacy_mgr.getWar(tribe_id, other_id)) |war| {
+                    const losing = (war.isAttacker(tribe_id) and war.war_score < -30) or
+                                   (!war.isAttacker(tribe_id) and war.war_score > 30);
+
+                    if (losing and self.rng.float() < 0.05) {
+                        // Sue for peace
+                        self.diplomacy_mgr.modifyReputation(tribe_id, other_id, 10);
+                    }
+                }
+            }
+
+            // Consider alliance if friendly
+            if (!at_war and rep > 50 and !self.diplomacy_mgr.hasTreaty(tribe_id, other_id, .military_alliance)) {
+                if (self.rng.float() < 0.02) { // 2% chance per AI tick
+                    _ = self.diplomacy_mgr.createTreaty(.military_alliance, tribe_id, other_id, self.time);
+                }
+            }
+
+            // Consider trade if neutral or better
+            if (!at_war and rep >= 0) {
+                if (self.rng.float() < 0.01) { // 1% chance
+                    if (self.diplomacy_mgr.createTradeOffer(tribe_id, other_id, self.time)) |offer| {
+                        // Set up simple trade: food for other resources
+                        if (t.food > 50) {
+                            offer.offer_food = 20;
+                            offer.request_wood = 10;
+                            offer.request_stone = 5;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Update interactions (eating, combat, reproduction) - Enhanced with diplomacy
     fn updateInteractions(self: *Simulation, delta: f32) void {
         for (0..self.organisms.count) |i| {
             if (!self.organisms.alive[i]) continue;
@@ -362,29 +557,61 @@ pub const Simulation = struct {
         }
     }
 
-    /// Handle interaction between two organisms
+    /// Handle interaction between two organisms - Enhanced with diplomacy/war
     fn handleInteraction(self: *Simulation, i: usize, j: usize, delta: f32) void {
         const type_i = @as(organism.OrganismType, @enumFromInt(self.organisms.types[i]));
         const type_j = @as(organism.OrganismType, @enumFromInt(self.organisms.types[j]));
 
+        const tribe_i = self.organisms.tribe_ids[i];
+        const tribe_j = self.organisms.tribe_ids[j];
+
+        // Get tech bonuses for combat
+        const bonuses_i = self.tech_mgr.getBonuses(tribe_i);
+        const bonuses_j = self.tech_mgr.getBonuses(tribe_j);
+
         // Eating
         if (self.organisms.is_eating[i]) {
             if (type_i == .herbivore and type_j == .plant) {
-                self.organisms.energies[i] += delta * 20.0;
-                self.organisms.energies[j] -= delta * 20.0;
+                // Apply seasonal food gathering modifier
+                const food_amount = delta * 20.0 * self.season_mgr.food_modifier;
+                self.organisms.energies[i] += food_amount;
+                self.organisms.energies[j] -= food_amount;
             } else if (type_i == .carnivore and type_j == .herbivore) {
                 self.organisms.energies[i] += delta * 30.0;
                 self.organisms.healths[j] -= delta * 10.0;
             }
         }
 
-        // Combat
+        // Combat - Enhanced with diplomacy, war, and tech
         if (self.organisms.is_attacking[i] and type_j != .plant) {
-            const same_tribe = self.organisms.tribe_ids[i] == self.organisms.tribe_ids[j];
-            if (!same_tribe) {
-                const damage = delta * 5.0;
-                self.organisms.healths[j] -= damage;
-                self.organisms.energies[i] -= delta * 2.0; // Attacking costs energy
+            const same_tribe = tribe_i == tribe_j;
+            const at_war = self.diplomacy_mgr.isAtWar(tribe_i, tribe_j);
+            const is_allied = self.diplomacy_mgr.hasTreaty(tribe_i, tribe_j, .military_alliance);
+
+            // Don't attack same tribe or allies
+            if (same_tribe or is_allied) return;
+
+            // Base damage with tech bonus
+            var damage = delta * 5.0;
+            damage += bonuses_i.attack_bonus * delta * 0.1;
+
+            // Apply defender's defense bonus
+            const defense_reduction = bonuses_j.defense_bonus * delta * 0.05;
+            damage = @max(0, damage - defense_reduction);
+
+            self.organisms.healths[j] -= damage;
+            self.organisms.energies[i] -= delta * 2.0; // Attacking costs energy
+
+            // If at war, record casualty if killed
+            if (at_war and self.organisms.healths[j] <= 0) {
+                if (self.diplomacy_mgr.getWar(tribe_i, tribe_j)) |war| {
+                    war.recordCasualty(war.isAttacker(tribe_j));
+                }
+            }
+
+            // Combat reduces reputation
+            if (tribe_i < self.tribes.count and tribe_j < self.tribes.count) {
+                self.diplomacy_mgr.modifyReputation(tribe_i, tribe_j, -1);
             }
         }
     }
@@ -405,12 +632,84 @@ pub const Simulation = struct {
             }
         }
 
+        // Initialize population health state
+        self.population_mgr.initOrganism(organism_id, &self.rng);
+
         return organism_id;
     }
 
     /// Create a new tribe
     pub fn createTribe(self: *Simulation) ?u32 {
-        return self.tribes.createTribe(&self.rng);
+        const tribe_id = self.tribes.createTribe(&self.rng);
+
+        if (tribe_id) |id| {
+            // Give starting technologies
+            if (self.tech_mgr.getResearch(id)) |research| {
+                // Start with fire and stone tools discovered
+                _ = research.startResearch(.fire);
+                _ = research.addResearchPoints(100); // Complete it
+                _ = research.startResearch(.stone_tools);
+            }
+        }
+
+        return tribe_id;
+    }
+
+    // === PUBLIC ACCESSORS FOR NEW SYSTEMS ===
+
+    /// Get current season
+    pub fn getCurrentSeason(self: *const Simulation) seasons.Season {
+        return self.season_mgr.current_season;
+    }
+
+    /// Get current weather
+    pub fn getCurrentWeather(self: *const Simulation) seasons.Weather {
+        return self.season_mgr.current_weather;
+    }
+
+    /// Get current day
+    pub fn getCurrentDay(self: *const Simulation) u32 {
+        return self.season_mgr.current_day;
+    }
+
+    /// Get current year
+    pub fn getCurrentYear(self: *const Simulation) u32 {
+        return self.season_mgr.current_year;
+    }
+
+    /// Get time of day (0-1)
+    pub fn getTimeOfDay(self: *const Simulation) f32 {
+        return self.season_mgr.getTimeOfDay();
+    }
+
+    /// Get tribe technology level
+    pub fn getTribeTechLevel(self: *const Simulation, tribe_id: u32) u32 {
+        return self.tech_mgr.getTechLevel(tribe_id);
+    }
+
+    /// Get tribe territory count
+    pub fn getTribeTerritoryCount(self: *const Simulation, tribe_id: u32) u32 {
+        return self.territory_mgr.getTerritoryCount(tribe_id);
+    }
+
+    /// Check if tribes are at war
+    pub fn areTribesAtWar(self: *const Simulation, tribe_a: u32, tribe_b: u32) bool {
+        return self.diplomacy_mgr.isAtWar(tribe_a, tribe_b);
+    }
+
+    /// Get reputation between tribes
+    pub fn getTribesReputation(self: *const Simulation, tribe_a: u32, tribe_b: u32) i8 {
+        return self.diplomacy_mgr.getReputation(tribe_a, tribe_b);
+    }
+
+    /// Get active war count
+    pub fn getActiveWarCount(self: *const Simulation) usize {
+        return self.diplomacy_mgr.getActiveWarCount();
+    }
+
+    /// Get active treaty count
+    pub fn getActiveTreatyCount(self: *const Simulation) usize {
+        return self.diplomacy_mgr.getActiveTreatyCount();
     }
 
     /// Get statistics
@@ -425,6 +724,22 @@ pub const Simulation = struct {
             .frame_count = self.frame_count,
         };
     }
+
+    /// Get extended statistics
+    pub fn getExtendedStats(self: *const Simulation) ExtendedStats {
+        return .{
+            .season = @intFromEnum(self.season_mgr.current_season),
+            .weather = @intFromEnum(self.season_mgr.current_weather),
+            .day = self.season_mgr.current_day,
+            .year = self.season_mgr.current_year,
+            .active_wars = @intCast(self.diplomacy_mgr.getActiveWarCount()),
+            .active_treaties = @intCast(self.diplomacy_mgr.getActiveTreatyCount()),
+            .active_events = @intCast(self.season_mgr.event_count),
+            .total_births = self.population_mgr.total_births,
+            .total_deaths = self.population_mgr.total_deaths,
+            .total_diseases = self.population_mgr.total_disease_cases,
+        };
+    }
 };
 
 /// Simulation statistics
@@ -436,6 +751,20 @@ pub const SimulationStats = struct {
     message_count: usize,
     time: f32,
     frame_count: u64,
+};
+
+/// Extended statistics for AAA systems
+pub const ExtendedStats = struct {
+    season: u8,
+    weather: u8,
+    day: u32,
+    year: u32,
+    active_wars: u32,
+    active_treaties: u32,
+    active_events: u32,
+    total_births: u64,
+    total_deaths: u64,
+    total_diseases: u64,
 };
 
 // Tests
@@ -464,4 +793,14 @@ test "Simulation spawn and update" {
 
     try std.testing.expect(sim.time > 0);
     try std.testing.expectEqual(@as(u64, 60), sim.frame_count);
+}
+
+test "Simulation new systems initialized" {
+    var sim = try Simulation.init(std.testing.allocator, 42, 100);
+    defer sim.deinit();
+
+    // Check new systems are initialized
+    try std.testing.expectEqual(seasons.Season.spring, sim.getCurrentSeason());
+    try std.testing.expectEqual(@as(u32, 1), sim.getCurrentYear());
+    try std.testing.expectEqual(@as(usize, 0), sim.getActiveWarCount());
 }

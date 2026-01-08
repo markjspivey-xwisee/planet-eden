@@ -1,5 +1,6 @@
 // Enhanced WASM Application Entry Point - Full tribal civilization simulator
 
+import * as THREE from 'three';
 import { WasmModule, OrganismType } from './wasm-loader.js';
 import { Renderer } from './renderer.js';
 import { WasmUI } from './wasm-ui.js';
@@ -17,6 +18,7 @@ import { settingsSystem } from './engine/settings.js';
 import { saveSystem } from './engine/savesystem.js';
 import { uiAnimations } from './engine/uianimations.js';
 import { hud } from './engine/hud.js';
+import { aaaUISystem } from './engine/aaa-ui.js';
 
 // Global flag to indicate new HUD is active - prevents old UI systems from creating elements
 window.PLANET_EDEN_USE_NEW_HUD = true;
@@ -45,6 +47,7 @@ class PlanetEdenWasm {
         this.saveSystem = saveSystem;
         this.uiAnimations = uiAnimations;
         this.hud = hud;
+        this.aaaUI = aaaUISystem;
     }
 
     async init() {
@@ -244,6 +247,19 @@ class PlanetEdenWasm {
             featureStatus.hud = true;
         } catch (error) {
             console.warn('[Planet Eden WASM] ⚠️ HUD failed to initialize:', error);
+        }
+
+        // AAA UI System - Premium micro-interactions, tooltips, notifications, minimap, etc.
+        try {
+            this.aaaUI.init(
+                this.wasmModule,
+                this.renderer,
+                featureStatus.audio ? this.audioSystem : null,
+                this.hud
+            );
+            featureStatus.aaaUI = true;
+        } catch (error) {
+            console.warn('[Planet Eden WASM] ⚠️ AAA UI system failed to initialize:', error);
         }
 
         // Log feature initialization summary
@@ -603,6 +619,10 @@ class PlanetEdenWasm {
         if (this.pauseOverlay) {
             this.pauseOverlay.style.display = this.running ? 'none' : 'block';
         }
+        // Notify AAA-UI system of pause state change
+        if (this.aaaUI) {
+            this.aaaUI.onPauseStateChanged(!this.running);
+        }
         console.log(`[Planet Eden WASM] ${this.running ? '▶️ STARTED' : '⏸️ PAUSED'}`);
     }
 
@@ -616,8 +636,13 @@ class PlanetEdenWasm {
             const adjustedDelta = delta * this.timeScale;
             this.wasmModule.update(adjustedDelta);
 
-            // Update particle system
+            // Update particle system with weather wind info
             if (this.particleSystem) {
+                // Sync wind from weather system for wind-affected particles
+                if (this.renderer.weatherSystem) {
+                    const weatherInfo = this.renderer.weatherSystem.getWeatherInfo();
+                    this.particleSystem.setWind(weatherInfo.windDirection, weatherInfo.windStrength);
+                }
                 this.particleSystem.update(adjustedDelta);
             }
 
@@ -628,6 +653,9 @@ class PlanetEdenWasm {
 
             // Update population sparkline
             this.sparkline.sample(stats, typeCounts);
+
+            // Update audio system with game state
+            this.updateAudioSystem(stats, typeCounts);
         }
 
         // Always update renderer and UI
@@ -638,8 +666,60 @@ class PlanetEdenWasm {
         // Update new HUD
         this.updateHUD();
 
+        // Update AAA UI system (minimap, notifications, etc.)
+        if (this.aaaUI) {
+            this.aaaUI.update(delta);
+        }
+
         // Continue loop
         requestAnimationFrame(() => this.gameLoop());
+    }
+
+    updateAudioSystem(stats, typeCounts) {
+        if (!this.audioSystem || !this.audioSystem.enabled) return;
+
+        // Update time of day for day/night sounds
+        if (this.renderer.timeSystem) {
+            const timeInfo = this.renderer.timeSystem.getTimeInfo();
+            // Convert hour (0-24) to 0-1 range where 0 = midnight, 0.5 = noon
+            const normalizedTime = timeInfo.hour / 24;
+            this.audioSystem.setTimeOfDay(normalizedTime);
+        }
+
+        // Update game state for adaptive music
+        this.audioSystem.updateGameState(stats, {
+            isConflict: this.detectConflict(),
+            recentDeaths: this.recentDeathCount || 0,
+            recentBirths: this.recentBirthCount || 0
+        });
+
+        // Update listener position based on camera
+        if (this.renderer.camera) {
+            const camPos = this.renderer.camera.position;
+            const camDir = this.renderer.camera.getWorldDirection(new THREE.Vector3());
+            this.audioSystem.updateListenerPosition(
+                { x: camPos.x, y: camPos.y, z: camPos.z },
+                { x: camDir.x, y: camDir.y, z: camDir.z }
+            );
+        }
+    }
+
+    // Detect if tribes are in conflict (simple heuristic)
+    detectConflict() {
+        const tribes = this.wasmModule.getAllTribes();
+        if (tribes.length < 2) return false;
+
+        // Check if any tribes are close to each other and both have members
+        // This is a simple heuristic - in a real implementation you'd track actual combat
+        for (let i = 0; i < tribes.length; i++) {
+            for (let j = i + 1; j < tribes.length; j++) {
+                if (tribes[i].memberCount > 3 && tribes[j].memberCount > 3) {
+                    // Multiple strong tribes exist - potential for conflict
+                    return Math.random() < 0.1; // 10% chance to trigger tension music
+                }
+            }
+        }
+        return false;
     }
 
     updateHUD() {

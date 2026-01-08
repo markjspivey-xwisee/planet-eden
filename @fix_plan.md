@@ -45,15 +45,15 @@ Key improvements made:
 
 - [x] Save/load simulation state to localStorage
 - [x] Settings menu (graphics quality, audio volume, time scale)
-- [ ] First-time tutorial/onboarding sequence
-- [ ] Pause menu with resume/restart/settings options
+- [x] First-time tutorial/onboarding sequence
+- [x] Pause menu with resume/restart/settings options
 
 ### Audio Excellence
 
 - [x] Background music (ambient, adaptive to time of day) - procedural ambient
 - [x] UI sound effects (button clicks, panel opens)
 - [x] Environmental sounds (wind, water, birds)
-- [ ] Creature sounds (movement, eating, combat)
+- [x] Creature sounds (movement, eating, combat)
 
 ---
 

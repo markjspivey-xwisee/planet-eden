@@ -1,12 +1,14 @@
-// renderer.js - Professional 3D Planet Renderer for Planet Eden WASM
+// renderer.js - AAA-Quality 3D Planet Renderer for Planet Eden WASM
 // Features: Spherical planet, atmosphere, sun, organisms on surface, click-to-select, neural network viz
+// Enhanced with: Post-processing effects, advanced particles, dynamic lighting, smooth animations
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { OrganismType, BuildingType, PlantType, GrowthStage } from './wasm-loader.js';
 import { TimeSystem } from './engine/time.js';
-import { AnimationSystem } from './engine/animation.js';
+import { AnimationSystem, ActivityState } from './engine/animation.js';
 import { WeatherSystem } from './engine/weather.js';
+import { VisualEffectsSystem } from './engine/effects.js';
 
 const PLANET_RADIUS = 50;
 const ORGANISM_SCALE = 1.25; // Reduced for more realistic proportions
@@ -103,6 +105,18 @@ export class Renderer {
 
         // Weather system (initialized after scene is created)
         this.weatherSystem = null;
+
+        // AAA Visual Effects System (post-processing, screen shake, vignette, color grading)
+        this.visualEffects = null;
+        this.usePostProcessing = true; // Can be toggled for performance
+
+        // Combat and event tracking for visual effects
+        this.lastCombatTime = 0;
+        this.screenShakeQueued = false;
+
+        // Movement dust tracking
+        this.dustEmitTimers = new Map(); // id -> last emit time
+        this.DUST_EMIT_INTERVAL = 0.15; // Seconds between dust emissions
     }
 
     init(container) {
@@ -118,12 +132,48 @@ export class Renderer {
         this.initRaycaster();
         this.initWeather();
         this.initResourceNodes();
+        this.initVisualEffects();
 
         window.addEventListener('resize', () => this.onWindowResize());
-        console.log('[Renderer] Professional 3D planet initialized');
+        console.log('[Renderer] AAA-quality 3D planet initialized with visual effects');
 
         // Add test markers to verify rendering works
         this.addTestMarkers();
+    }
+
+    // Initialize AAA visual effects system
+    initVisualEffects() {
+        if (!this.usePostProcessing) {
+            console.log('[Renderer] Post-processing disabled');
+            return;
+        }
+
+        try {
+            this.visualEffects = new VisualEffectsSystem(this.renderer, this.scene, this.camera);
+            this.visualEffects.init();
+
+            // Set initial color grading based on time
+            this.visualEffects.setColorGrading('day');
+
+            // Connect lightning to screen shake
+            if (this.weatherSystem) {
+                this.weatherSystem.setLightningCallback((strikeData) => {
+                    // Trigger lightning flash effect
+                    this.visualEffects.triggerLightningFlash();
+
+                    // Emit lightning particles
+                    if (this.particleSystem) {
+                        const pos = strikeData.position;
+                        this.particleSystem.emitLightningFlash(pos.x, pos.y, pos.z, strikeData.intensity);
+                    }
+                });
+            }
+
+            console.log('[Renderer] Visual effects system initialized');
+        } catch (error) {
+            console.warn('[Renderer] Failed to initialize visual effects:', error);
+            this.usePostProcessing = false;
+        }
     }
 
     initResourceNodes() {
@@ -275,7 +325,14 @@ export class Renderer {
     // Set particle system reference for birth/death effects
     setParticleSystem(particleSystem) {
         this.particleSystem = particleSystem;
-        console.log('[Renderer] Particle system connected for life events');
+
+        // Configure particle system for spherical planet
+        if (particleSystem) {
+            particleSystem.planetRadius = PLANET_RADIUS;
+            particleSystem.useSphericalGravity = true;
+        }
+
+        console.log('[Renderer] Particle system connected with spherical gravity');
     }
 
     // Set audio system reference for weather sounds
@@ -1121,6 +1178,24 @@ export class Renderer {
         this.selectedOrganism = id;
         const mesh = this.organisms.get(id);
 
+        // Notify AAA UI system of selection
+        if (this.onEntitySelected) {
+            const orgData = this.wasmModule?.getOrganismData();
+            if (orgData && id < orgData.count) {
+                this.onEntitySelected({
+                    id: id,
+                    type: orgData.types[id],
+                    x: orgData.x[id],
+                    y: orgData.y[id],
+                    z: orgData.z[id],
+                    health: orgData.health?.[id] || 100,
+                    energy: orgData.energy?.[id] || 100,
+                    age: orgData.age?.[id] || 0,
+                    tribeId: orgData.tribeIds[id]
+                }, 'creature');
+            }
+        }
+
         if (mesh) {
             // Create selection group to hold all selection effects
             this.selectionGroup = new THREE.Group();
@@ -1189,6 +1264,11 @@ export class Renderer {
 
         this.selectedOrganism = null;
         this.hideNeuralNetworkPanel();
+
+        // Notify AAA UI system of deselection
+        if (this.onEntityDeselected) {
+            this.onEntityDeselected();
+        }
     }
 
     // Update selection effect animation (called from render loop)
@@ -1275,18 +1355,10 @@ export class Renderer {
         this.buildingPanel.className = 'info-panel-mobile';
         this.buildingPanel.style.cssText = `
             position: fixed;
-            top: 20px;
-            right: 320px;
-            background: rgba(20, 20, 30, 0.95);
-            border: 2px solid rgba(255, 170, 0, 0.6);
-            border-radius: 12px;
-            padding: 1.5rem;
+            top: 80px;
+            right: 12px;
             color: white;
             font-family: 'Segoe UI', Arial, sans-serif;
-            min-width: 280px;
-            max-width: 350px;
-            z-index: 1000;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
         `;
 
         const buildingTypeNames = {
@@ -1447,18 +1519,10 @@ export class Renderer {
         this.resourcePanel.className = 'info-panel-mobile';
         this.resourcePanel.style.cssText = `
             position: fixed;
-            top: 20px;
-            right: 320px;
-            background: rgba(20, 30, 30, 0.95);
-            border: 2px solid rgba(0, 255, 255, 0.6);
-            border-radius: 12px;
-            padding: 1.5rem;
+            top: 80px;
+            right: 12px;
             color: white;
             font-family: 'Segoe UI', Arial, sans-serif;
-            min-width: 250px;
-            max-width: 320px;
-            z-index: 1000;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
         `;
 
         const resourceTypes = {
@@ -1552,18 +1616,10 @@ export class Renderer {
         this.cloudPanel.className = 'info-panel-mobile';
         this.cloudPanel.style.cssText = `
             position: fixed;
-            top: 20px;
-            right: 320px;
-            background: rgba(30, 40, 60, 0.95);
-            border: 2px solid rgba(170, 220, 255, 0.6);
-            border-radius: 12px;
-            padding: 1.5rem;
+            top: 80px;
+            right: 12px;
             color: white;
             font-family: 'Segoe UI', Arial, sans-serif;
-            min-width: 260px;
-            max-width: 320px;
-            z-index: 1000;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
         `;
 
         const weatherIcons = {
@@ -1685,12 +1741,7 @@ export class Renderer {
                 max-width: 95vw;
                 max-height: 90vh;
                 overflow-y: auto;
-                background: rgba(0, 0, 0, 0.95);
-                border: 2px solid #0F0;
-                border-radius: 12px;
-                padding: 20px;
                 z-index: 9999;
-                box-shadow: 0 0 40px rgba(0, 255, 0, 0.5);
                 color: #fff;
             `;
 
@@ -2155,6 +2206,11 @@ export class Renderer {
                     // Update animation state based on movement
                     this.animationSystem.updateAnimationState(id, moveDist > 0.01, moveDist);
 
+                    // Emit movement dust for fast-moving creatures (AAA effect)
+                    if (moveDist > 0.03 && this.particleSystem) {
+                        this.emitMovementDustForOrganism(id, mesh.position, moveDist, moveVec.normalize());
+                    }
+
                     // Only update orientation if moving significantly
                     if (moveDist > 0.01) {
                         // Get the normal at this position (points outward from planet center)
@@ -2249,6 +2305,12 @@ export class Renderer {
                 const pos = mesh.position;
                 this.particleSystem.emitBirth(pos.x, pos.y, pos.z, orgType);
             }
+
+            // Play birth sound for newly created organisms (skip plants)
+            if (isNewOrganism && this.audioSystem && this.audioSystem.enabled && orgType !== 0) {
+                const pos = mesh.position;
+                this.audioSystem.playEventSound('birth', { x: pos.x, y: pos.y, z: pos.z });
+            }
         }
 
         // Update humanoid behaviors (chopping, mining, building)
@@ -2311,6 +2373,11 @@ export class Renderer {
                         if (Date.now() - activity.lastEffectTime > 300) {
                             this.createChoppingEffect(plantMesh.position);
                             activity.lastEffectTime = Date.now();
+                            // Play spatial chop sound
+                            if (this.audioSystem && this.audioSystem.enabled) {
+                                const pos = plantMesh.position;
+                                this.audioSystem.playSpatialSound('chop', { x: pos.x, y: pos.y, z: pos.z }, 0.3);
+                            }
                         }
 
                         // Tree falls after enough chopping
@@ -2321,6 +2388,11 @@ export class Renderer {
                             if (tribeId !== 0xFFFFFFFF) {
                                 this.addTribeResource(tribeId, this.RESOURCE_TYPES.WOOD, 15);
                                 console.log(`[Renderer] Tribe ${tribeId} gained 15 wood`);
+                                // Play harvest sound
+                                if (this.audioSystem && this.audioSystem.enabled) {
+                                    const pos = plantMesh.position;
+                                    this.audioSystem.playEventSound('harvest', { x: pos.x, y: pos.y, z: pos.z });
+                                }
                             }
                             this.humanoidActivities.delete(i);
                         }
@@ -2407,6 +2479,11 @@ export class Renderer {
                             const result = this.tryBuild(flatX, flatZ, tribeId, buildType);
                             if (result) {
                                 console.log(`[Renderer] Humanoid ${i} built a ${buildType}!`);
+                                // Play building complete sound
+                                if (this.audioSystem && this.audioSystem.enabled) {
+                                    const pos = mesh.position;
+                                    this.audioSystem.playEventSound('buildingComplete', { x: pos.x, y: pos.y, z: pos.z });
+                                }
                             }
                         }
                     }
@@ -2762,6 +2839,22 @@ export class Renderer {
             occupants: [],
             resources: { wood: 0, stone: 0, gold: 0, iron: 0 }
         });
+
+        // AAA Effect: Add campfire glow for huts and workshops (at night they glow)
+        if ((buildingType === 'hut' || buildingType === 'workshop') && this.visualEffects) {
+            const glowPos = surfaceInfo.position.clone();
+            glowPos.add(surfaceInfo.position.clone().normalize().multiplyScalar(1)); // Slightly above surface
+            this.visualEffects.addCampfireGlow(buildingId, glowPos, buildingType === 'workshop' ? 1.5 : 1.0);
+        }
+
+        // Emit construction dust particles
+        if (this.particleSystem) {
+            this.particleSystem.emitConstruction(
+                surfaceInfo.position.x,
+                surfaceInfo.position.y,
+                surfaceInfo.position.z
+            );
+        }
 
         const cost = this.BUILDING_COSTS[buildingType] || this.BUILDING_COSTS.hut;
         console.log(`[Renderer] ${buildingType} built for tribe ${tribeId} (cost: ${JSON.stringify(cost)})`);
@@ -3674,16 +3767,30 @@ export class Renderer {
     removeOrganism(id) {
         const mesh = this.organisms.get(id);
         if (mesh) {
+            // Get position for effects
+            const pos = new THREE.Vector3();
+            mesh.getWorldPosition(pos);
+            const orgType = mesh.userData.organismType;
+
             // Emit death particles at organism's last position
             if (this.particleSystem) {
-                const pos = new THREE.Vector3();
-                mesh.getWorldPosition(pos);
                 this.particleSystem.emitDeath(pos.x, pos.y, pos.z);
+            }
+
+            // AAA effect: Screen shake for significant deaths (humanoids)
+            if (this.visualEffects && orgType === 3) {
+                this.visualEffects.triggerScreenShake(0.25, 0.15);
+            }
+
+            // Play death sound at organism's position
+            if (this.audioSystem && this.audioSystem.enabled) {
+                this.audioSystem.playEventSound('death', { x: pos.x, y: pos.y, z: pos.z });
             }
 
             this.planetGroup.remove(mesh);
             this.organisms.delete(id);
             this.previousPositions.delete(id);
+            this.dustEmitTimers.delete(id); // Clean up dust timer
             this.animationSystem.removeAnimationState(id);
 
             if (this.selectedOrganism === id) {
@@ -3866,7 +3973,103 @@ export class Renderer {
         // Update controls
         this.controls.update();
 
-        this.renderer.render(this.scene, this.camera);
+        // Update and render with visual effects (post-processing)
+        if (this.visualEffects && this.usePostProcessing) {
+            // Update visual effects each frame
+            this.visualEffects.update(deltaMs);
+
+            // Update color grading based on time of day
+            this.updateColorGradingForTime(timeInfo);
+
+            // Update vignette for storms
+            this.updateVignetteForWeather();
+
+            // Render using effect composer
+            this.visualEffects.render();
+        } else {
+            // Fallback to standard rendering
+            this.renderer.render(this.scene, this.camera);
+        }
+    }
+
+    // Update color grading based on time of day
+    updateColorGradingForTime(timeInfo) {
+        if (!this.visualEffects || !timeInfo) return;
+
+        // Map time phase to color grading preset
+        const phaseToGrading = {
+            'night': 'night',
+            'dawn': 'dawn',
+            'morning': 'day',
+            'day': 'day',
+            'sunset': 'sunset',
+            'dusk': 'dusk'
+        };
+
+        const grading = phaseToGrading[timeInfo.phase] || 'normal';
+        this.visualEffects.setColorGrading(grading, 0.5); // Slow transition
+    }
+
+    // Update vignette based on weather conditions
+    updateVignetteForWeather() {
+        if (!this.visualEffects || !this.weatherSystem) return;
+
+        const weatherInfo = this.weatherSystem.getWeatherInfo();
+
+        // Storm creates strong vignette
+        if (weatherInfo.isStorming) {
+            this.visualEffects.setVignetteIntensity(0.6);
+            this.visualEffects.setColorGrading('storm', 1.0);
+        } else if (weatherInfo.isRaining) {
+            this.visualEffects.setVignetteIntensity(0.3);
+        } else {
+            this.visualEffects.setVignetteIntensity(0);
+        }
+    }
+
+    // Trigger combat visual effects
+    triggerCombatEffects(attackerPos, defenderPos, intensity = 1.0) {
+        if (this.visualEffects) {
+            this.visualEffects.triggerScreenShake(intensity * 0.5, 0.2);
+        }
+
+        if (this.particleSystem) {
+            // Combat impact particles at defender position
+            this.particleSystem.emitCombatImpact(
+                defenderPos.x, defenderPos.y, defenderPos.z, intensity
+            );
+        }
+    }
+
+    // Trigger death visual effects
+    triggerDeathEffects(position, organismType) {
+        if (this.visualEffects) {
+            // Small screen shake for significant deaths
+            if (organismType === 3) { // Humanoid
+                this.visualEffects.triggerScreenShake(0.3, 0.15);
+            }
+        }
+
+        if (this.particleSystem) {
+            this.particleSystem.emitDeath(position.x, position.y, position.z);
+        }
+    }
+
+    // Emit movement dust for fast-moving creatures
+    emitMovementDustForOrganism(id, position, speed, direction) {
+        if (!this.particleSystem) return;
+
+        const now = Date.now() / 1000;
+        const lastEmit = this.dustEmitTimers.get(id) || 0;
+
+        if (now - lastEmit >= this.DUST_EMIT_INTERVAL && speed > 0.05) {
+            this.particleSystem.emitMovementDust(
+                position.x, position.y, position.z,
+                speed * 10, // Scale speed for effect
+                direction
+            );
+            this.dustEmitTimers.set(id, now);
+        }
     }
 
     updateTimeDisplay(info) {
@@ -3906,6 +4109,11 @@ export class Renderer {
         this.camera.aspect = window.innerWidth / window.innerHeight;
         this.camera.updateProjectionMatrix();
         this.renderer.setSize(window.innerWidth, window.innerHeight);
+
+        // Also resize visual effects composer
+        if (this.visualEffects) {
+            this.visualEffects.onResize(window.innerWidth, window.innerHeight);
+        }
     }
 
     // Camera controls for keyboard
